@@ -135,6 +135,7 @@ REQUIRED_TOP_LEVEL = [
     "general_engineering_value_threshold",
     "skill_dependency_graph",
     "roadmap_tracks",
+    "cumulative_system",
     "investigation_roadmap",
     "proof_of_work_ladder",
     "first_investigation_prompt",

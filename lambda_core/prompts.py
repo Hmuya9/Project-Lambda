@@ -18,6 +18,7 @@ CONTRACT_JSON_SCHEMA: dict = {
         "general_engineering_value_threshold",
         "skill_dependency_graph",
         "roadmap_tracks",
+        "cumulative_system",
         "investigation_roadmap",
         "proof_of_work_ladder",
         "first_investigation_prompt",
@@ -313,9 +314,11 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "minItems": 4,
                     "maxItems": 12,
                     "description": (
-                        "Titles/ids of general-value investigations. Fluidstack-like: "
-                        "software portability; Python automation; config/env; "
-                        "logging/errors; APIs; Why Docker exists; health checks; metrics."
+                        "General-value investigations ONLY. May include: software "
+                        "portability; Python automation; config/env; logging/errors; "
+                        "APIs; Why Docker exists; health checks; basic metrics. "
+                        "FORBIDDEN here: hardware telemetry, Redfish/BMC/IPMI, GPU "
+                        "repair/qualification/fleet repair workflows."
                     ),
                 },
                 "role_specific_track": {
@@ -324,10 +327,68 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "minItems": 3,
                     "maxItems": 10,
                     "description": (
-                        "Titles/ids of JD-specific investigations. Fluidstack-like: "
-                        "repair state machines; hardware telemetry; Redfish/BMC; "
-                        "GPU qualification; GPU repair pipeline simulation."
+                        "JD-specific investigations ONLY. Fluidstack-like: repair "
+                        "state machines; hardware telemetry; Redfish/BMC/IPMI; GPU "
+                        "qualification; fleet ops; repair pipeline simulation; "
+                        "incident/postmortem discipline for fleet failures."
                     ),
+                },
+            },
+        },
+        "cumulative_system": {
+            "type": "object",
+            "additionalProperties": False,
+            "description": (
+                "ONE growing engineering artifact — not many mini-projects. "
+                "For Fluidstack-like roles use a role-shaped name like "
+                "fleet-repair-lab / gpu-fleet-ops-lab / compute-fleet-health-lab. "
+                "FORBIDDEN names: Software Portability, Python Automation, "
+                "Docker Project, API Project."
+            ),
+            "required": [
+                "system_name",
+                "system_purpose",
+                "why_this_system_matches_the_role",
+                "starting_scope",
+                "final_capstone_shape",
+                "suggested_repo_name",
+                "repo_growth_model",
+            ],
+            "properties": {
+                "system_name": {"type": "string"},
+                "system_purpose": {"type": "string"},
+                "why_this_system_matches_the_role": {"type": "string"},
+                "starting_scope": {"type": "string"},
+                "final_capstone_shape": {"type": "string"},
+                "suggested_repo_name": {
+                    "type": "string",
+                    "description": "Same identity as system_name (kebab-case repo).",
+                },
+                "repo_growth_model": {
+                    "type": "array",
+                    "minItems": 5,
+                    "maxItems": 12,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "investigation_number",
+                            "folder_or_module_added",
+                            "capability_added",
+                            "why_it_matters",
+                            "evidence_created",
+                        ],
+                        "properties": {
+                            "investigation_number": {"type": "integer"},
+                            "folder_or_module_added": {
+                                "type": "string",
+                                "description": "e.g. src/machine_report.py or src/api/",
+                            },
+                            "capability_added": {"type": "string"},
+                            "why_it_matters": {"type": "string"},
+                            "evidence_created": {"type": "string"},
+                        },
+                    },
                 },
             },
         },
@@ -366,12 +427,19 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "exit_criteria",
                     "builds_on_prior_artifact",
                     "artifact_this_investigation_produces",
+                    "module_or_folder_added",
+                    "delta_from_previous_investigation",
+                    "capstone_delta",
                 ],
                 "properties": {
                     "title": {"type": "string"},
                     "track": {
                         "type": "string",
-                        "description": "Exactly 'general' or 'role_specific'.",
+                        "description": (
+                            "Exactly 'general' or 'role_specific'. "
+                            "Hardware telemetry / Redfish / BMC / GPU repair / "
+                            "qualification / fleet repair MUST be role_specific."
+                        ),
                     },
                     "expensive_problem": {"type": "string"},
                     "engineering_question": {"type": "string"},
@@ -380,17 +448,21 @@ CONTRACT_JSON_SCHEMA: dict = {
                         "type": "string",
                         "description": (
                             "MULTI-PARAGRAPH / LAYERED (>=300 chars). Explain system "
-                            "layers or causal chain the learner must picture. Must use "
-                            "causal/layer language (at least two of: because, depends, "
-                            "layer, failure, assumption, runtime, dependency, "
-                            "environment, signal, state). Forbidden: one-sentence slogans."
+                            "layers or causal chain the learner must picture. MUST "
+                            "literally include at least two of these words in the text: "
+                            "because, depends, layer, failure, assumption, runtime, "
+                            "dependency, environment, signal, state. Example opener: "
+                            "'This depends on a stack of assumptions at each layer; "
+                            "failure happens because the environment or runtime differs.' "
+                            "Forbidden: one-sentence slogans. Applies to EVERY "
+                            "investigation including Capstone."
                         ),
                     },
                     "visual_system_model": {
                         "type": "string",
                         "description": (
                             "Describe a diagram the learner should sketch "
-                            "(boxes, arrows, failure points)."
+                            "(boxes, arrows, failure points). >=80 characters."
                         ),
                     },
                     "subquestions": {
@@ -442,7 +514,33 @@ CONTRACT_JSON_SCHEMA: dict = {
                         "maxItems": 8,
                     },
                     "builds_on_prior_artifact": {"type": "string"},
-                    "artifact_this_investigation_produces": {"type": "string"},
+                    "artifact_this_investigation_produces": {
+                        "type": "string",
+                        "description": (
+                            "Must be a module/folder/file INSIDE the one cumulative "
+                            "repo — not a new separate repository."
+                        ),
+                    },
+                    "module_or_folder_added": {
+                        "type": "string",
+                        "description": "Path added to the cumulative repo this investigation.",
+                    },
+                    "delta_from_previous_investigation": {
+                        "type": "string",
+                        "description": (
+                            "For Investigation 1: 'none — starting investigation'. "
+                            "Otherwise: what NEW proof/capability this adds vs previous."
+                        ),
+                    },
+                    "capstone_delta": {
+                        "type": "string",
+                        "description": (
+                            "For final investigation ONLY: what new operational proof "
+                            "beyond prior integration (failure injection, MTTD/MTTR, "
+                            "false positives, escalation boundaries, postmortem). "
+                            "For non-final: 'n/a — not the capstone'."
+                        ),
+                    },
                 },
             },
         },
@@ -451,8 +549,9 @@ CONTRACT_JSON_SCHEMA: dict = {
             "minItems": 5,
             "maxItems": 10,
             "description": (
-                "ONE progressive system that grows. Capstone (e.g. GPU repair "
-                "pipeline simulation) is LAST only."
+                "ONE progressive system that grows. same_system_name MUST match "
+                "cumulative_system.system_name on EVERY level. Capstone is LAST. "
+                "NOT separate projects."
             ),
             "items": {
                 "type": "object",
@@ -460,27 +559,32 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "required": [
                     "level",
                     "title",
-                    "proves",
-                    "scope",
-                    "extends_previous_level",
                     "same_system_name",
+                    "module_or_folder_added",
+                    "extends_previous",
+                    "new_capability_added",
+                    "what_new_proof_it_creates",
+                    "why_this_is_not_a_separate_project",
                     "evidence",
-                    "why_not_before_prerequisites",
                     "connected_investigations",
                 ],
                 "properties": {
                     "level": {"type": "integer"},
                     "title": {"type": "string"},
-                    "proves": {"type": "string"},
-                    "scope": {"type": "string"},
-                    "extends_previous_level": {"type": "string"},
-                    "same_system_name": {"type": "string"},
+                    "same_system_name": {
+                        "type": "string",
+                        "description": "Identical across all levels; role-shaped name.",
+                    },
+                    "module_or_folder_added": {"type": "string"},
+                    "extends_previous": {"type": "string"},
+                    "new_capability_added": {"type": "string"},
+                    "what_new_proof_it_creates": {"type": "string"},
+                    "why_this_is_not_a_separate_project": {"type": "string"},
                     "evidence": {
                         "type": "array",
                         "items": {"type": "string"},
                         "minItems": 1,
                     },
-                    "why_not_before_prerequisites": {"type": "string"},
                     "connected_investigations": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -518,8 +622,11 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "ready_to_paste_prompt": {
                     "type": "string",
                     "description": (
-                        "Complete multi-section prompt including Phase 0 BEFORE build. "
-                        "Must not recommend Docker tutorials for Investigation 1."
+                        "Complete multi-section prompt. MUST literally include the "
+                        "section headings containing these substrings: 'Phase 0', "
+                        "'mental model', 'observe', 'build', 'break', 'improve', "
+                        "'GitHub', 'Obsidian'. Phase 0 BEFORE build. Must not "
+                        "recommend Docker tutorials for Investigation 1."
                     ),
                 },
                 "expensive_problem": {"type": "string"},
@@ -556,9 +663,13 @@ CONTRACT_JSON_SCHEMA: dict = {
         "evidence_plan": {
             "type": "object",
             "additionalProperties": False,
+            "description": (
+                "ONE primary GitHub repository with folders/modules — never many "
+                "disconnected repos."
+            ),
             "required": [
                 "obsidian_pages",
-                "github_repos_or_folders",
+                "github_repository",
                 "diagrams",
                 "benchmarks_or_logs",
                 "readme_sections",
@@ -570,10 +681,39 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "items": {"type": "string"},
                     "minItems": 5,
                 },
-                "github_repos_or_folders": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 2,
+                "github_repository": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "repo_name",
+                        "repo_purpose",
+                        "final_folder_structure",
+                        "evidence_files",
+                    ],
+                    "properties": {
+                        "repo_name": {
+                            "type": "string",
+                            "description": "Must match cumulative_system.suggested_repo_name.",
+                        },
+                        "repo_purpose": {"type": "string"},
+                        "final_folder_structure": {
+                            "type": "string",
+                            "description": (
+                                "Text tree of the ONE repo (README, docs/, src/, tests/, "
+                                "outputs/). Not a list of multiple repos."
+                            ),
+                        },
+                        "evidence_files": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 6,
+                            "description": (
+                                "Include README.md, docs/architecture.md, "
+                                "docs/failure-log.md, docs/verification-log.md, "
+                                "docs/incident-postmortem.md, outputs/, tests/, src/ paths."
+                            ),
+                        },
+                    },
                 },
                 "diagrams": {
                     "type": "array",
@@ -584,6 +724,10 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 4,
+                    "description": (
+                        "Prefer ops-credible: failure injection log, MTTD/MTTR, "
+                        "alert trigger log, return-to-service verification."
+                    ),
                 },
                 "readme_sections": {
                     "type": "array",
@@ -638,6 +782,7 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "background_not_treated_as_software_evidence",
                 "capstone_is_last",
                 "technologies_tied_to_engineering_pain",
+                "one_cumulative_system_not_many_repos",
                 "notes",
             ],
             "properties": {
@@ -650,6 +795,7 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "background_not_treated_as_software_evidence": {"type": "boolean"},
                 "capstone_is_last": {"type": "boolean"},
                 "technologies_tied_to_engineering_pain": {"type": "boolean"},
+                "one_cumulative_system_not_many_repos": {"type": "boolean"},
                 "notes": {"type": "array", "items": {"type": "string"}},
             },
         },
@@ -719,7 +865,10 @@ Must follow this order in substance:
 Mental model BEFORE implementation. No one-sentence mental models.
 Each phase_0_mental_model must be >=300 characters and use causal/layer language
 (at least two of: because, depends, layer, failure, assumption, runtime,
-dependency, environment, signal, state).
+dependency, environment, signal, state). EVERY investigation including mid
+and capstone must satisfy this — no exceptions for later investigations.
+Each visual_system_model must be >=80 characters and describe boxes/arrows/
+layers/failure points to sketch.
 
 DOCKER / EARLY-TOOL RULE (critical)
 For most software/systems roles, Investigation 1 MUST be:
@@ -739,32 +888,49 @@ automation, APIs, Docker, etc. still require artifacts (repo, setup log, README,
 shell notes, troubleshooting notes, diagrams, benchmarks).
 
 ROADMAP TRACKS
-general_engineering_track: broad engineering value
-  (portability, Python automation, config/logs, APIs, Why Docker, health, metrics)
-role_specific_track: JD specialization
-  (repair state machines, hardware telemetry, Redfish/BMC, GPU qualification,
-   GPU repair pipeline simulation as CAPSTONE last)
+general_engineering_track ONLY:
+  portability, Python automation, config/logs, APIs, Why Docker, health checks,
+  basic metrics.
+role_specific_track ONLY:
+  repair state machines, hardware telemetry, Redfish/BMC/IPMI, GPU qualification,
+  fleet operations, repair pipeline simulation, incident/postmortem for fleet
+  failures, CAPSTONE last.
+FORBIDDEN: putting hardware telemetry / Redfish / GPU repair / qualification in
+the general track.
 
-PROOF LADDER
-One progressive system (same_system_name). Capstone last.
+CUMULATIVE SINGLE-SYSTEM RULE (critical)
+Do NOT create many mini-repos (Software Portability Repo, Docker Repo, etc.).
+Create ONE cumulative system such as:
+  fleet-repair-lab / gpu-fleet-ops-lab / compute-fleet-health-lab
+Populate cumulative_system with stable system_name + suggested_repo_name and a
+repo_growth_model (folder/module added each investigation).
+proof_of_work_ladder.same_system_name MUST match cumulative_system.system_name
+on EVERY level.
+Each ladder level adds module_or_folder_added + new_capability_added +
+what_new_proof_it_creates + why_this_is_not_a_separate_project.
+evidence_plan.github_repository describes ONE repo tree (README, docs/, src/,
+tests/, outputs/) — never a list of many repos.
+Capstone is the mature version of the SAME repo. Capstone MUST include a real
+capstone_delta: failure injection, MTTD/MTTR, false-positive notes, escalation
+boundaries, verification log, postmortem — not a duplicate of the prior step.
 Prefer highly automated common repair paths with explicit human escalation —
 never "fully automated".
 
 FLUIDSTACK-LIKE PROGRESSION (adapt titles; keep order spirit)
-1. How does software move between machines and still work? (NO Docker)
-2. Python automation with config, logs, clear failure modes
-3. Why do services expose APIs?
-4. Why does Docker exist?
-5. Why do production systems need health checks?
-6. Why do metrics and alerts exist?
-7. Why does repair become a state machine?
-8. How does hardware telemetry expose fleet health? (mocked Redfish/BMC concepts)
-9. How would a GPU repair pipeline simulation work?
-10. Capstone: GPU Repair Pipeline Simulation (last)
+1. How does software move between machines and still work? (NO Docker) [general]
+2. Python automation with config, logs, clear failure modes [general]
+3. Why do services expose APIs? [general]
+4. Why does Docker exist? [general]
+5. Why do production systems need health checks? [general]
+6. Why do metrics and alerts exist? [general]
+7. Why does repair become a state machine? [role_specific]
+8. How does hardware telemetry expose fleet health? [role_specific]
+9. How would a GPU repair pipeline simulation work? [role_specific]
+10. Capstone verification + incident/postmortem evidence on SAME repo [role_specific]
 
 OUTPUT
 Match the JSON schema exactly.
-Fill guardrail_checks honestly.
+Fill guardrail_checks honestly (including one_cumulative_system_not_many_repos).
 Be concrete, problem-first, and cumulative.
 """
 
@@ -775,19 +941,27 @@ def build_user_prompt(job_description: str, engineer_profile: str) -> str:
 Hard requirements for THIS run:
 1. Investigation 1 = software portability / environment mismatch. NO Docker.
 2. Docker only later as "Why does Docker exist?" after portability pain.
-3. Every investigation: layered Phase 0 mental model (>=300 chars) that includes
-   at least two of these exact words/stems in natural sentences: because, depends,
-   layer, failure, assumption, runtime, dependency, environment, signal, state.
-   Also include visual model + subquestions BEFORE build; technologies as
+3. EVERY investigation (including mid and Capstone): Phase 0 mental model
+   (>=300 chars) using >=2 of: because, depends, layer, failure, assumption,
+   runtime, dependency, environment, signal, state. visual_system_model >=80
+   chars with boxes/arrows/layers. Technologies as
    {{technology, engineering_pain_it_solves}} objects.
-4. Separate candidate transferable intuition from missing artifact evidence.
-5. Fill roadmap_tracks (general vs role_specific).
-6. Fill missing_mental_models and performance_requirements.
-7. Capstone / GPU repair pipeline simulation MUST be the FINAL investigation
-   and the FINAL proof-of-work ladder level — never in the middle.
-8. first_investigation_prompt must be paste-ready with Phase 0 before build;
-   no Docker beginner tutorials; include observe/build/break/improve/GitHub/Obsidian.
-9. Fill guardrail_checks honestly.
+4. Separate transferable intuition from missing artifact evidence.
+5. Track discipline: telemetry/Redfish/BMC/GPU repair/qualification = role_specific
+   only. General track stops at portability/automation/API/Docker/health/metrics.
+6. ONE cumulative system (e.g. fleet-repair-lab). Fill cumulative_system +
+   repo_growth_model. Forbidden system names: Software Portability, Python
+   Automation, Docker Project, API Project.
+7. proof_of_work_ladder: identical same_system_name on every level; each level
+   adds module_or_folder_added + new capability/proof; not separate projects.
+8. evidence_plan.github_repository = ONE repo with final_folder_structure tree
+   and evidence_files — not many repos.
+9. Capstone LAST; capstone_delta must add verification/measurement/postmortem
+   proof beyond prior integration (not a duplicate).
+10. first_investigation_prompt paste-ready; no Docker; ready_to_paste_prompt MUST
+    literally contain headings with: Phase 0, mental model, observe, build, break,
+    improve, GitHub, Obsidian.
+11. Fill guardrail_checks honestly.
 
 === JOB DESCRIPTION ===
 {job_description.strip()}

@@ -104,12 +104,75 @@ ARTIFACT_TERMS = (
     "note",
 )
 
+FORBIDDEN_SYSTEM_NAMES = (
+    "software portability",
+    "python automation",
+    "docker project",
+    "api project",
+    "docker setup",
+    "health check project",
+)
+
+ROLE_SHAPED_SYSTEM_WORDS = (
+    "fleet",
+    "repair",
+    "compute",
+    "gpu",
+    "ops",
+    "health",
+    "infrastructure",
+    "telemetry",
+)
+
+ROLE_SPECIFIC_ONLY_TERMS = (
+    "hardware telemetry",
+    "redfish",
+    "bmc",
+    "ipmi",
+    "gpu repair",
+    "fleet repair",
+    "gpu qualification",
+    "repair pipeline",
+    "fleet health",
+    "fleet ops",
+    "repair become a state",
+    "repair state machine",
+)
+
+# Hard role/hardware terms that must never appear on a general investigation.
+# Broader "repair*" language can appear as foreshadowing in early mental models.
+GENERAL_TRACK_FORBIDDEN = (
+    "hardware telemetry",
+    "redfish",
+    "bmc",
+    "ipmi",
+    "gpu repair",
+    "fleet repair",
+    "gpu qualification",
+    "repair pipeline",
+    "mocked redfish",
+    "mocked bmc",
+)
+
 CAPSTONE_EARLY_TERMS = (
     "capstone",
     "final pipeline",
     "gpu repair pipeline simulation",
     "full repair pipeline",
     "end-to-end gpu repair",
+)
+
+CAPSTONE_DELTA_TERMS = (
+    "verification",
+    "failure injection",
+    "mttd",
+    "mttr",
+    "false positive",
+    "escalat",
+    "postmortem",
+    "incident",
+    "measurement",
+    "benchmark",
 )
 
 
@@ -415,7 +478,7 @@ def validate_roadmap(data: dict[str, Any]) -> None:
                 f"artifacts ({label})."
             )
 
-    # 9. Tracks must be separated
+    # 9. Tracks must be separated + track discipline
     tracks = data.get("roadmap_tracks") or {}
     general_track = tracks.get("general_engineering_track") or []
     role_track = tracks.get("role_specific_track") or []
@@ -431,9 +494,28 @@ def validate_roadmap(data: dict[str, Any]) -> None:
     ]
     unique_tracks = {t for t in track_labels if t}
     if unique_tracks and unique_tracks <= {"general"}:
-        failures.append("All investigations are marked only 'general' — role_specific missing.")
+        failures.append("All investigations are marked only 'general' - role_specific missing.")
     if unique_tracks and unique_tracks <= {"role_specific"}:
-        failures.append("All investigations are marked only 'role_specific' — general missing.")
+        failures.append("All investigations are marked only 'role_specific' - general missing.")
+
+    for label in general_track:
+        hits = _contains_any(str(label), ROLE_SPECIFIC_ONLY_TERMS)
+        if hits:
+            failures.append(
+                "roadmap_tracks.general_engineering_track contains role-specific topic "
+                f"'{label}' ({', '.join(hits)}). Move to role_specific_track."
+            )
+    for inv in investigations:
+        if str(inv.get("track", "")).lower() != "general":
+            continue
+        # Only reject clear role/hardware specialization on general track — title field.
+        title = _lower(str(inv.get("title") or ""))
+        hits = _contains_any(title, GENERAL_TRACK_FORBIDDEN)
+        if hits:
+            failures.append(
+                f"Investigation '{inv.get('title', '')}' is marked general but includes "
+                f"role-specific terms: {', '.join(sorted(set(hits)))}."
+            )
 
     # 10. First investigation prompt must be paste-ready
     if not isinstance(first_prompt, dict):
@@ -441,10 +523,10 @@ def validate_roadmap(data: dict[str, Any]) -> None:
     else:
         ready = first_prompt.get("ready_to_paste_prompt") or ""
         if not isinstance(ready, str) or len(ready.strip()) < 1000:
-                failures.append(
-                    "first_investigation_prompt.ready_to_paste_prompt is missing or too short "
-                    "(need >=1000 characters)."
-                )
+            failures.append(
+                "first_investigation_prompt.ready_to_paste_prompt is missing or too short "
+                "(need >=1000 characters)."
+            )
         else:
             ready_l = ready.lower()
             required_bits = (
@@ -468,6 +550,154 @@ def validate_roadmap(data: dict[str, Any]) -> None:
                     "first_investigation_prompt.ready_to_paste_prompt includes Docker "
                     "(forbidden for Investigation 1)."
                 )
+
+    # 11. Cumulative system exists and is role-shaped
+    cumulative = data.get("cumulative_system")
+    if not isinstance(cumulative, dict):
+        failures.append("cumulative_system is missing.")
+    else:
+        system_name = str(cumulative.get("system_name") or "").strip()
+        suggested = str(cumulative.get("suggested_repo_name") or "").strip()
+        if not system_name:
+            failures.append("cumulative_system.system_name is missing.")
+        if not suggested:
+            failures.append("cumulative_system.suggested_repo_name is missing.")
+        name_blob = _lower(system_name + " " + suggested)
+        if any(bad == name_blob or bad in name_blob for bad in FORBIDDEN_SYSTEM_NAMES):
+            failures.append(
+                f"cumulative_system name '{system_name}' is too generic / syllabus-like "
+                "(avoid Software Portability, Python Automation, Docker Project, API Project)."
+            )
+        if system_name and not any(w in name_blob for w in ROLE_SHAPED_SYSTEM_WORDS):
+            failures.append(
+                f"cumulative_system name '{system_name}' should be role-shaped "
+                "(include words like fleet, repair, compute, GPU, ops, health, infrastructure)."
+            )
+        growth = cumulative.get("repo_growth_model") or []
+        if not isinstance(growth, list) or len(growth) < 5:
+            failures.append(
+                "cumulative_system.repo_growth_model must list how the repo grows "
+                "(>=5 module additions)."
+            )
+
+    # 12. Stable same_system_name + module growth on ladder
+    ladder = data.get("proof_of_work_ladder") or []
+    system_names: list[str] = []
+    for i, level in enumerate(ladder, start=1):
+        if not isinstance(level, dict):
+            failures.append(f"proof_of_work_ladder item {i} must be an object.")
+            continue
+        same = str(level.get("same_system_name") or "").strip()
+        if not same:
+            failures.append(f"proof_of_work_ladder level {i} missing same_system_name.")
+        else:
+            system_names.append(same)
+            if any(bad in same.lower() for bad in FORBIDDEN_SYSTEM_NAMES):
+                failures.append(
+                    f"proof_of_work_ladder level {i} uses forbidden/generic system name "
+                    f"'{same}'."
+                )
+        module = str(level.get("module_or_folder_added") or "").strip()
+        if not module:
+            failures.append(
+                f"proof_of_work_ladder level {i} missing module_or_folder_added."
+            )
+        capability = str(level.get("new_capability_added") or "").strip()
+        if not capability:
+            failures.append(
+                f"proof_of_work_ladder level {i} missing new_capability_added."
+            )
+        why_not_sep = str(level.get("why_this_is_not_a_separate_project") or "").strip()
+        if not why_not_sep:
+            failures.append(
+                f"proof_of_work_ladder level {i} missing why_this_is_not_a_separate_project."
+            )
+
+    if system_names and len(set(s.lower() for s in system_names)) > 1:
+        failures.append(
+            "proof_of_work_ladder same_system_name is not stable across levels: "
+            + ", ".join(sorted(set(system_names)))
+            + "."
+        )
+    if (
+        isinstance(cumulative, dict)
+        and system_names
+        and str(cumulative.get("system_name") or "").strip()
+    ):
+        expected = str(cumulative.get("system_name")).strip().lower()
+        if any(s.lower() != expected for s in system_names):
+            failures.append(
+                "proof_of_work_ladder.same_system_name must match "
+                f"cumulative_system.system_name ('{cumulative.get('system_name')}')."
+            )
+
+    # 13. One-repo evidence plan (no multi-repo syllabus)
+    evidence_plan = data.get("evidence_plan") or {}
+    github = evidence_plan.get("github_repository") if isinstance(evidence_plan, dict) else None
+    if not isinstance(github, dict):
+        # legacy multi-repo field
+        legacy = (
+            evidence_plan.get("github_repos_or_folders")
+            if isinstance(evidence_plan, dict)
+            else None
+        )
+        if isinstance(legacy, list) and len(legacy) >= 3:
+            failures.append(
+                "evidence_plan suggests multiple disconnected repos "
+                f"({len(legacy)} entries). Use one github_repository with folders/modules."
+            )
+        failures.append("evidence_plan.github_repository is missing (one primary repo required).")
+    else:
+        repo_name = str(github.get("repo_name") or "").strip()
+        tree = str(github.get("final_folder_structure") or "")
+        files = github.get("evidence_files") or []
+        if not repo_name:
+            failures.append("evidence_plan.github_repository.repo_name is missing.")
+        if not tree or len(tree.strip()) < 40:
+            failures.append(
+                "evidence_plan.github_repository.final_folder_structure is missing/too short."
+            )
+        # reject multi-repo smell inside tree / files
+        combined = _lower(tree + " " + " ".join(str(x) for x in files) + " " + repo_name)
+        repo_mentions = len(re.findall(r"\brepo\b", combined))
+        if repo_mentions >= 3 and (
+            "repos" in combined or combined.count("github.com") >= 2
+        ):
+            failures.append(
+                "evidence_plan appears to describe multiple repos; keep one primary repository."
+            )
+        if isinstance(files, list):
+            titled_repos = [
+                f for f in files if isinstance(f, str) and re.search(r"\brepo\b", f, re.I)
+            ]
+            if len(titled_repos) >= 3:
+                failures.append(
+                    "evidence_plan.evidence_files contains multiple 'Repo' entries implying "
+                    "disconnected projects."
+                )
+
+    # 14. Capstone delta required on final investigation
+    final = investigations[-1]
+    capstone_delta = str(final.get("capstone_delta") or "").strip()
+    if not capstone_delta or capstone_delta.lower().startswith("n/a"):
+        failures.append(
+            "Final investigation missing real capstone_delta "
+            "(must add verification/measurement/incident/postmortem proof)."
+        )
+    elif not _contains_any(capstone_delta, CAPSTONE_DELTA_TERMS):
+        failures.append(
+            "Final investigation capstone_delta does not clearly add operational proof "
+            "(expected verification, failure injection, MTTD/MTTR, false positive, "
+            "escalation, postmortem, incident, measurement, or benchmark language)."
+        )
+
+    for i, inv in enumerate(investigations[1:], start=2):
+        delta = str(inv.get("delta_from_previous_investigation") or "").strip()
+        if not delta or delta.lower().startswith("none"):
+            failures.append(
+                f"Investigation {i} ({inv.get('title', '')}) missing "
+                "delta_from_previous_investigation."
+            )
 
     if failures:
         bullet = "\n".join(f"- {f}" for f in failures)

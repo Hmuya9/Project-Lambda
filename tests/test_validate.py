@@ -58,7 +58,10 @@ def _minimal_good_roadmap() -> dict:
         "two_minute_explanation_target": "Explain environment mismatch failures.",
         "exit_criteria": ["c1", "c2", "c3"],
         "builds_on_prior_artifact": "none",
-        "artifact_this_investigation_produces": "portable script repo",
+        "artifact_this_investigation_produces": "src/machine_report.py in fleet-repair-lab",
+        "module_or_folder_added": "src/machine_report.py",
+        "delta_from_previous_investigation": "none — starting investigation",
+        "capstone_delta": "n/a — not the capstone",
     }
     inv_docker = {
         **copy.deepcopy(inv_portability),
@@ -86,24 +89,33 @@ def _minimal_good_roadmap() -> dict:
                 ),
             }
         ],
-        "builds_on_prior_artifact": "portable script repo",
-        "artifact_this_investigation_produces": "Dockerfile + run notes",
+        "builds_on_prior_artifact": "src/machine_report.py",
+        "artifact_this_investigation_produces": "Dockerfile for fleet-repair-lab",
+        "module_or_folder_added": "Dockerfile",
+        "delta_from_previous_investigation": "Containerizes the same repo so packaging is explicit.",
+        "capstone_delta": "n/a — not the capstone",
     }
     inv_api = {
         **copy.deepcopy(inv_portability),
         "title": "Why do services expose APIs?",
         "track": "general",
         "technologies_involved": [],
-        "builds_on_prior_artifact": "portable script repo",
-        "artifact_this_investigation_produces": "tiny HTTP service",
+        "builds_on_prior_artifact": "src/machine_report.py",
+        "artifact_this_investigation_produces": "src/api/",
+        "module_or_folder_added": "src/api/",
+        "delta_from_previous_investigation": "Adds an HTTP boundary to the same system.",
+        "capstone_delta": "n/a — not the capstone",
     }
     inv_health = {
         **copy.deepcopy(inv_portability),
         "title": "Why do production systems need health checks?",
         "track": "general",
         "technologies_involved": [],
-        "builds_on_prior_artifact": "tiny HTTP service",
-        "artifact_this_investigation_produces": "health endpoint",
+        "builds_on_prior_artifact": "src/api/",
+        "artifact_this_investigation_produces": "src/health/",
+        "module_or_folder_added": "src/health/",
+        "delta_from_previous_investigation": "Adds health endpoints and failure states.",
+        "capstone_delta": "n/a — not the capstone",
     }
     inv_capstone = {
         **copy.deepcopy(inv_portability),
@@ -112,8 +124,17 @@ def _minimal_good_roadmap() -> dict:
         "expensive_problem": "Fleet repair without a pipeline loses throughput.",
         "engineering_question": "How do telemetry, state machines, and metrics compose?",
         "technologies_involved": [],
-        "builds_on_prior_artifact": "health endpoint",
-        "artifact_this_investigation_produces": "repair pipeline sim",
+        "builds_on_prior_artifact": "src/health/",
+        "artifact_this_investigation_produces": "docs/verification-log.md + postmortem",
+        "module_or_folder_added": "docs/verification-log.md",
+        "delta_from_previous_investigation": (
+            "Adds verification discipline on top of the integrated repair workflow."
+        ),
+        "capstone_delta": (
+            "Previous work integrated repair. Capstone adds failure injection, measured "
+            "MTTD/MTTR, false-positive notes, escalation boundaries, verification log, "
+            "and an incident postmortem."
+        ),
     }
 
     paste = """### Investigation 1: How does software move between machines and still work?
@@ -199,6 +220,30 @@ Engineering page: Software Portability.
                 "gpu repair pipeline",
             ],
         },
+        "cumulative_system": {
+            "system_name": "fleet-repair-lab",
+            "system_purpose": "Grow one fleet repair simulation system.",
+            "why_this_system_matches_the_role": "Mirrors GPU fleet repair operations.",
+            "starting_scope": "portable machine report script",
+            "final_capstone_shape": "verified repair pipeline with postmortem evidence",
+            "suggested_repo_name": "fleet-repair-lab",
+            "repo_growth_model": [
+                {
+                    "investigation_number": n,
+                    "folder_or_module_added": mod,
+                    "capability_added": cap,
+                    "why_it_matters": "cumulative growth",
+                    "evidence_created": "artifact",
+                }
+                for n, mod, cap in [
+                    (1, "src/machine_report.py", "portability baseline"),
+                    (2, "src/api/", "API boundary"),
+                    (3, "Dockerfile", "container packaging"),
+                    (4, "src/health/", "health checks"),
+                    (5, "docs/verification-log.md", "capstone verification"),
+                ]
+            ],
+        },
         "investigation_roadmap": [
             inv_portability,
             inv_api,
@@ -206,7 +251,27 @@ Engineering page: Software Portability.
             inv_health,
             inv_capstone,
         ],
-        "proof_of_work_ladder": [],
+        "proof_of_work_ladder": [
+            {
+                "level": n,
+                "title": title,
+                "same_system_name": "fleet-repair-lab",
+                "module_or_folder_added": mod,
+                "extends_previous": "prior level of fleet-repair-lab",
+                "new_capability_added": cap,
+                "what_new_proof_it_creates": proof,
+                "why_this_is_not_a_separate_project": "Same repo, new module only.",
+                "evidence": ["README update", "module code"],
+                "connected_investigations": [title],
+            }
+            for n, title, mod, cap, proof in [
+                (1, "foundation", "src/machine_report.py", "report", "setup log"),
+                (2, "api", "src/api/", "http", "api tests"),
+                (3, "docker", "Dockerfile", "image", "run log"),
+                (4, "health", "src/health/", "health", "health log"),
+                (5, "capstone", "docs/verification-log.md", "verify", "postmortem"),
+            ]
+        ],
         "first_investigation_prompt": {
             "ready_to_paste_prompt": paste,
             "expensive_problem": "portability",
@@ -217,7 +282,35 @@ Engineering page: Software Portability.
             "intentionally_break_debug": "break",
             "improve": "improve",
         },
-        "evidence_plan": {},
+        "evidence_plan": {
+            "obsidian_pages": ["a", "b", "c", "d", "e"],
+            "github_repository": {
+                "repo_name": "fleet-repair-lab",
+                "repo_purpose": "one cumulative fleet repair system",
+                "final_folder_structure": (
+                    "fleet-repair-lab/\n"
+                    "├── README.md\n"
+                    "├── docs/\n"
+                    "├── src/\n"
+                    "├── tests/\n"
+                    "└── outputs/\n"
+                ),
+                "evidence_files": [
+                    "README.md",
+                    "docs/architecture.md",
+                    "docs/failure-log.md",
+                    "docs/verification-log.md",
+                    "docs/incident-postmortem.md",
+                    "outputs/metrics-sample.json",
+                    "tests/",
+                    "src/",
+                ],
+            },
+            "diagrams": ["d1", "d2", "d3", "d4"],
+            "benchmarks_or_logs": ["b1", "b2", "b3", "b4"],
+            "readme_sections": ["r1", "r2", "r3", "r4"],
+            "interview_artifacts": ["i1", "i2", "i3"],
+        },
         "interview_readiness_map": [
             {
                 "expectation": "portability",
