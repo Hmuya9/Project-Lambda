@@ -10,6 +10,7 @@ from typing import Any
 from openai import OpenAI
 
 from lambda_core.prompts import CONTRACT_JSON_SCHEMA, SYSTEM_PROMPT, build_user_prompt
+from lambda_core.validate import validate_roadmap
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -120,21 +121,26 @@ def generate_contract(job_description: str, engineer_profile: str) -> dict[str, 
         raise RuntimeError("Model returned empty content.")
     data = json.loads(content)
     _require_keys(data)
+    validate_roadmap(data)
     return data
 
 
 REQUIRED_TOP_LEVEL = [
     "role_interpretation",
     "expensive_problem_map",
+    "performance_requirements",
     "surface_keywords_vs_deep_skills",
-    "candidate_background_translation",
-    "general_value_threshold",
+    "candidate_transfer_map",
+    "missing_mental_models",
+    "general_engineering_value_threshold",
     "skill_dependency_graph",
+    "roadmap_tracks",
     "investigation_roadmap",
     "proof_of_work_ladder",
     "first_investigation_prompt",
     "evidence_plan",
     "interview_readiness_map",
+    "guardrail_checks",
 ]
 
 

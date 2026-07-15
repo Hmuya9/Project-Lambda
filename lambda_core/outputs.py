@@ -1,4 +1,4 @@
-"""Render and write Markdown Role-to-Roadmap outputs."""
+"""Render and write Markdown Project Lambda Role-to-Roadmap outputs."""
 
 from __future__ import annotations
 
@@ -13,11 +13,17 @@ def _bullets(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items)
 
 
+def _yes_no(value: bool) -> str:
+    return "yes" if value else "no"
+
+
 def render_markdown(contract: dict[str, Any], *, job_source: str, profile_source: str) -> str:
     role = contract["role_interpretation"]
-    bg = contract["candidate_background_translation"]
+    transfer = contract["candidate_transfer_map"]
+    tracks = contract["roadmap_tracks"]
     first = contract["first_investigation_prompt"]
     evidence = contract["evidence_plan"]
+    guards = contract["guardrail_checks"]
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     problems = "\n\n".join(
@@ -29,33 +35,49 @@ def render_markdown(contract: dict[str, Any], *, job_source: str, profile_source
         for i, item in enumerate(contract["expensive_problem_map"], start=1)
     )
 
+    performance = "\n".join(
+        f"- **{item['requirement']}** _(source: {item['source']})_ — {item['why_it_matters']}"
+        for item in contract["performance_requirements"]
+    )
+
     keywords = "\n\n".join(
         f"### `{item['surface_keyword']}` → {item['deep_skill_or_principle']}\n"
-        f"- **Why it matters:** {item['why_it_matters']}\n"
+        f"- **Engineering pain behind it:** {item['engineering_pain_behind_it']}\n"
         f"- **Danger of learning in isolation:** {item['danger_of_learning_it_in_isolation']}"
         for item in contract["surface_keywords_vs_deep_skills"]
     )
 
-    strengths = "\n\n".join(
-        f"### {item['strength']}\n"
+    intuition = "\n\n".join(
+        f"### {item['intuition']}\n"
         f"- **Profile anchor:** {item['profile_anchor']}\n"
-        f"- **Role relevance:** {item['role_relevance']}"
-        for item in bg["transferable_strengths"]
+        f"- **Role relevance:** {item['role_relevance']}\n"
+        f"- **Why this is not yet software evidence:** {item['why_this_is_not_yet_software_evidence']}"
+        for item in transfer["transferable_intuition"]
     )
 
-    gaps = "\n\n".join(
+    missing_ev = "\n\n".join(
         f"### Gap: {item['gap']}\n"
         f"- **Why it blocks credibility:** {item['why_it_blocks_credibility']}\n"
-        f"- **Learn first instead:** {item['first_thing_to_learn_instead']}"
-        for item in bg["real_gaps"]
+        f"- **Artifact required:** {item['artifact_required']}\n"
+        f"- **First mental model to build:** {item['first_mental_model_to_build']}"
+        for item in transfer["missing_evidence"]
+    )
+
+    missing_mm = "\n\n".join(
+        f"### {item['mental_model']}\n"
+        f"- **Why required before role work:** {item['why_required_before_role_work']}\n"
+        f"- **What goes wrong without it:** {item['what_goes_wrong_without_it']}\n"
+        f"- **First investigation that builds it:** {item['first_investigation_that_builds_it']}"
+        for item in contract["missing_mental_models"]
     )
 
     threshold = "\n\n".join(
         f"### [{item['capability_scope']}] {item['capability']}\n"
         f"- **Why it matters generally:** {item['why_it_matters_generally']}\n"
         f"- **Connected role problem:** {item['connected_role_problem']}\n"
-        f"- **Evidence that proves it:** {item['evidence_that_proves_it']}"
-        for item in contract["general_value_threshold"]
+        f"- **Artifact evidence required:** {item['artifact_evidence_required']}\n"
+        f"- **Transferable intuition note:** {item['transferable_intuition_note']}"
+        for item in contract["general_engineering_value_threshold"]
     )
 
     deps = "\n\n".join(
@@ -66,22 +88,41 @@ def render_markdown(contract: dict[str, Any], *, job_source: str, profile_source
         for i, item in enumerate(contract["skill_dependency_graph"], start=1)
     )
 
-    roadmap = "\n\n".join(
-        f"### Investigation {i}: {item['title']}\n"
-        f"**Expensive problem:** {item['expensive_problem']}\n\n"
-        f"**Engineering question:** {item['engineering_question']}\n\n"
-        f"**Mental model to build:** {item['mental_model_to_build']}\n\n"
-        f"**Principles**\n{_bullets(item['principles'])}\n\n"
-        f"**Technologies introduced**\n{_bullets(item['technologies_introduced'])}\n\n"
-        f"**Observe existing system:** {item['observe_existing_system']}\n\n"
-        f"**Build or modify:** {item['build_or_modify']}\n\n"
-        f"**Break / debug / improve:** {item['break_debug_improve']}\n\n"
-        f"**Evidence output:** {item['evidence_output']}\n\n"
-        f"**Builds on prior artifact:** {item['builds_on_prior_artifact']}\n\n"
-        f"**Artifact this investigation produces:** {item['artifact_this_investigation_produces']}\n\n"
-        f"**Why this comes now:** {item['why_this_comes_now']}"
-        for i, item in enumerate(contract["investigation_roadmap"], start=1)
-    )
+    roadmap_parts: list[str] = []
+    for i, item in enumerate(contract["investigation_roadmap"], start=1):
+        techs = item["technologies_involved"]
+        if techs:
+            tech_block = "\n".join(
+                f"- **{t['technology']}** — pain: {t['engineering_pain_it_solves']}"
+                for t in techs
+            )
+        else:
+            tech_block = "_None yet — understand the pain before introducing tools._"
+
+        roadmap_parts.append(
+            f"### Investigation {i}: {item['title']}\n"
+            f"**Track:** `{item['track']}`\n\n"
+            f"**Expensive problem:** {item['expensive_problem']}\n\n"
+            f"**Engineering question:** {item['engineering_question']}\n\n"
+            f"**Why this matters for the role:** {item['why_matters_for_role']}\n\n"
+            f"#### Phase 0 — Mental model\n\n{item['phase_0_mental_model']}\n\n"
+            f"#### Visual system model\n\n{item['visual_system_model']}\n\n"
+            f"**Subquestions**\n{_bullets(item['subquestions'])}\n\n"
+            f"**Concepts and vocabulary**\n{_bullets(item['concepts_and_vocabulary'])}\n\n"
+            f"**Engineering principles**\n{_bullets(item['engineering_principles'])}\n\n"
+            f"**Technologies involved**\n{tech_block}\n\n"
+            f"**Observe first:** {item['observe_first']}\n\n"
+            f"**Build or modify:** {item['build_or_modify']}\n\n"
+            f"**Intentionally break / debug:** {item['intentionally_break_debug']}\n\n"
+            f"**Improve:** {item['improve']}\n\n"
+            f"**GitHub evidence:** {item['github_evidence']}\n\n"
+            f"**Obsidian Engineering Page:** {item['obsidian_engineering_page']}\n\n"
+            f"**Two-minute explanation target:** {item['two_minute_explanation_target']}\n\n"
+            f"**Exit criteria**\n{_bullets(item['exit_criteria'])}\n\n"
+            f"**Builds on prior artifact:** {item['builds_on_prior_artifact']}\n\n"
+            f"**Artifact this investigation produces:** {item['artifact_this_investigation_produces']}"
+        )
+    roadmap = "\n\n".join(roadmap_parts)
 
     ladder = "\n\n".join(
         f"### Level {item['level']}: {item['title']}\n"
@@ -104,7 +145,7 @@ def render_markdown(contract: dict[str, Any], *, job_source: str, profile_source
         for item in contract["interview_readiness_map"]
     )
 
-    return f"""# Role-to-Roadmap
+    return f"""# Project Lambda — Role-to-Roadmap
 
 _Generated by Project Lambda · {generated_at}_  
 _Job source:_ `{job_source}` · _Profile source:_ `{profile_source}`
@@ -124,64 +165,98 @@ _Job source:_ `{job_source}` · _Profile source:_ `{profile_source}`
 
 {problems}
 
-## 3. Surface keywords vs deep skills
+## 3. Performance requirements
+
+{performance}
+
+## 4. Surface keywords vs deep skills
 
 {keywords}
 
-## 4. Candidate background translation
+## 5. Candidate transfer map
 
-### Transferable strengths
+### Transferable intuition (not evidence)
 
-{strengths}
+{intuition}
 
-### Real gaps
+### Missing evidence (artifacts required)
 
-{gaps}
+{missing_ev}
 
 ### Misleading overclaims to avoid
 
-{_bullets(bg['misleading_overclaims_to_avoid'])}
+{_bullets(transfer['misleading_overclaims_to_avoid'])}
 
 ### Strongest positioning angle
 
-{bg['strongest_positioning_angle']}
+{transfer['strongest_positioning_angle']}
 
-## 5. General value threshold
+## 6. Missing mental models
+
+{missing_mm}
+
+## 7. General engineering value threshold
 
 {threshold}
 
-## 6. Skill dependency graph
+## 8. Skill dependency graph
 
 {deps}
 
-## 7. Investigation roadmap
+## 9. Roadmap tracks
+
+### General engineering track
+
+{_bullets(tracks['general_engineering_track'])}
+
+### Role-specific track
+
+{_bullets(tracks['role_specific_track'])}
+
+## 10. Investigation roadmap
 
 {roadmap}
 
-## 8. Proof-of-work ladder
+## 11. Proof-of-work ladder
 
 {ladder}
 
-## 9. First investigation prompt
+## 12. First investigation prompt
 
 **Expensive problem:** {first['expensive_problem']}
 
 **Engineering question:** {first['engineering_question']}
 
-**Phase 0 mental model:** {first['phase_0_mental_model']}
+### Phase 0 — Mental model
 
-**Dependency layers**
-{_bullets(first['dependency_layers'])}
+{first['phase_0_mental_model']}
+
+### Visual system model
+
+{first['visual_system_model']}
 
 **Subquestions**
 {_bullets(first['subquestions'])}
 
-**Visual resources / search prompts**
-{_bullets(first['visual_resources_or_search_prompts'])}
+**Concepts and vocabulary**
+{_bullets(first['concepts_and_vocabulary'])}
 
-**Observe / build / improve / evidence plan:** {first['observe_build_improve_evidence_plan']}
+**Observe first:** {first['observe_first']}
 
-**Reflection question:** {first['reflection_question']}
+**Build or modify:** {first['build_or_modify']}
+
+**Intentionally break / debug:** {first['intentionally_break_debug']}
+
+**Improve:** {first['improve']}
+
+**GitHub evidence:** {first['github_evidence']}
+
+**Obsidian Engineering Page:** {first['obsidian_engineering_page']}
+
+**Two-minute explanation target:** {first['two_minute_explanation_target']}
+
+**Exit criteria**
+{_bullets(first['exit_criteria'])}
 
 ### Ready to paste
 
@@ -189,7 +264,7 @@ _Job source:_ `{job_source}` · _Profile source:_ `{profile_source}`
 {first['ready_to_paste_prompt']}
 ```
 
-## 10. Evidence plan
+## 13. Evidence plan
 
 **Obsidian pages**
 {_bullets(evidence['obsidian_pages'])}
@@ -209,9 +284,22 @@ _Job source:_ `{job_source}` · _Profile source:_ `{profile_source}`
 **Interview artifacts**
 {_bullets(evidence['interview_artifacts'])}
 
-## 11. Interview readiness map
+## 14. Interview readiness map
 
 {interviews}
+
+## 15. Guardrail checks
+
+- **Inv 1 avoids Docker/K8s/Prometheus/Redfish:** {_yes_no(guards['investigation_1_avoids_docker_k8s_prometheus_redfish'])}
+- **Inv 1 is software portability:** {_yes_no(guards['investigation_1_is_software_portability'])}
+- **Docker only after portability pain:** {_yes_no(guards['docker_appears_only_after_portability_pain'])}
+- **Mental models layered (not one-liners):** {_yes_no(guards['mental_models_are_layered_not_one_liners'])}
+- **Background not treated as software evidence:** {_yes_no(guards['background_not_treated_as_software_evidence'])}
+- **Capstone is last:** {_yes_no(guards['capstone_is_last'])}
+- **Technologies tied to engineering pain:** {_yes_no(guards['technologies_tied_to_engineering_pain'])}
+
+**Notes**
+{_bullets(guards['notes'])}
 """
 
 

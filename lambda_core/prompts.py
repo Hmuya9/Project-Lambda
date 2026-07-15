@@ -1,6 +1,6 @@
-"""Prompt templates and output schema for Role-to-Roadmap generation.
+"""Prompt templates and output schema for Project Lambda Role-to-Roadmap generation.
 
-Improve the product by iterating here — keep the CLI and I/O layers stable.
+Iterate product behavior here — keep CLI/UI wrappers stable.
 """
 
 from __future__ import annotations
@@ -11,15 +11,19 @@ CONTRACT_JSON_SCHEMA: dict = {
     "required": [
         "role_interpretation",
         "expensive_problem_map",
+        "performance_requirements",
         "surface_keywords_vs_deep_skills",
-        "candidate_background_translation",
-        "general_value_threshold",
+        "candidate_transfer_map",
+        "missing_mental_models",
+        "general_engineering_value_threshold",
         "skill_dependency_graph",
+        "roadmap_tracks",
         "investigation_roadmap",
         "proof_of_work_ladder",
         "first_investigation_prompt",
         "evidence_plan",
         "interview_readiness_map",
+        "guardrail_checks",
     ],
     "properties": {
         "role_interpretation": {
@@ -32,22 +36,14 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "what_this_role_is_not",
             ],
             "properties": {
-                "one_liner": {
-                    "type": "string",
-                    "description": "Sharp, job-specific one-liner — not a generic infra slogan.",
-                },
-                "real_mission": {
-                    "type": "string",
-                    "description": "What expensive outcomes this hire exists to own.",
-                },
+                "one_liner": {"type": "string"},
+                "real_mission": {"type": "string"},
                 "what_success_looks_like": {
                     "type": "string",
                     "description": (
-                        "Grounded in the JD. Do not invent employer metrics; "
-                        "if proposing bars, label as proposed. "
-                        "Never say 'fully automated' — prefer highly automated "
-                        "common paths with explicit human escalation for ambiguous, "
-                        "unsafe, or failed recovery states."
+                        "Never say 'fully automated'. Prefer highly automated common "
+                        "paths with explicit human escalation for ambiguous, unsafe, "
+                        "or failed recovery states."
                     ),
                 },
                 "what_this_role_is_not": {
@@ -55,7 +51,6 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "items": {"type": "string"},
                     "minItems": 2,
                     "maxItems": 6,
-                    "description": "Common wrong framings of this JD to reject.",
                 },
             },
         },
@@ -63,9 +58,6 @@ CONTRACT_JSON_SCHEMA: dict = {
             "type": "array",
             "minItems": 3,
             "maxItems": 8,
-            "description": (
-                "Expensive engineering problems behind the role — before any project spec."
-            ),
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -81,12 +73,33 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "why_company_pays_for_it": {"type": "string"},
                     "constraints": {"type": "array", "items": {"type": "string"}},
                     "failure_modes": {"type": "array", "items": {"type": "string"}},
-                    "jd_evidence": {
+                    "jd_evidence": {"type": "string"},
+                },
+            },
+        },
+        "performance_requirements": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 10,
+            "description": "What 'good' looks like for the role — performance/ops bars.",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "requirement",
+                    "source",
+                    "why_it_matters",
+                ],
+                "properties": {
+                    "requirement": {"type": "string"},
+                    "source": {
                         "type": "string",
                         "description": (
-                            "Quote/paraphrase from JD, or 'Likely implied because …'."
+                            "'stated in JD' | 'likely implied' | "
+                            "'proposed project bar (not an employer requirement)'."
                         ),
                     },
+                    "why_it_matters": {"type": "string"},
                 },
             },
         },
@@ -100,84 +113,126 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "required": [
                     "surface_keyword",
                     "deep_skill_or_principle",
-                    "why_it_matters",
+                    "engineering_pain_behind_it",
                     "danger_of_learning_it_in_isolation",
                 ],
                 "properties": {
                     "surface_keyword": {"type": "string"},
                     "deep_skill_or_principle": {"type": "string"},
-                    "why_it_matters": {"type": "string"},
+                    "engineering_pain_behind_it": {
+                        "type": "string",
+                        "description": (
+                            "The expensive pain that made this keyword matter — "
+                            "not a tool definition."
+                        ),
+                    },
                     "danger_of_learning_it_in_isolation": {"type": "string"},
                 },
             },
         },
-        "candidate_background_translation": {
+        "candidate_transfer_map": {
             "type": "object",
             "additionalProperties": False,
+            "description": (
+                "Separate transferable intuition from missing software evidence. "
+                "Never treat background experience as proof of software capability."
+            ),
             "required": [
-                "transferable_strengths",
-                "real_gaps",
+                "transferable_intuition",
+                "missing_evidence",
                 "misleading_overclaims_to_avoid",
                 "strongest_positioning_angle",
             ],
             "properties": {
-                "transferable_strengths": {
+                "transferable_intuition": {
                     "type": "array",
                     "minItems": 2,
                     "maxItems": 8,
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
-                        "required": ["strength", "profile_anchor", "role_relevance"],
+                        "required": [
+                            "intuition",
+                            "profile_anchor",
+                            "role_relevance",
+                            "why_this_is_not_yet_software_evidence",
+                        ],
                         "properties": {
-                            "strength": {"type": "string"},
-                            "profile_anchor": {
-                                "type": "string",
-                                "description": "Grounded in the profile only — never invent.",
-                            },
+                            "intuition": {"type": "string"},
+                            "profile_anchor": {"type": "string"},
                             "role_relevance": {"type": "string"},
+                            "why_this_is_not_yet_software_evidence": {
+                                "type": "string",
+                                "description": (
+                                    "Explicitly state that intuition is not an artifact."
+                                ),
+                            },
                         },
                     },
                 },
-                "real_gaps": {
+                "missing_evidence": {
                     "type": "array",
                     "minItems": 2,
                     "maxItems": 8,
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
-                        "required": ["gap", "why_it_blocks_credibility", "first_thing_to_learn_instead"],
+                        "required": [
+                            "gap",
+                            "why_it_blocks_credibility",
+                            "artifact_required",
+                            "first_mental_model_to_build",
+                        ],
                         "properties": {
                             "gap": {"type": "string"},
                             "why_it_blocks_credibility": {"type": "string"},
-                            "first_thing_to_learn_instead": {
+                            "artifact_required": {
                                 "type": "string",
                                 "description": (
-                                    "Prerequisite mental model / principle — not a course list."
+                                    "Concrete artifact: repo, setup log, README, "
+                                    "shell notes, diagram, benchmark — not resume text."
                                 ),
                             },
+                            "first_mental_model_to_build": {"type": "string"},
                         },
                     },
                 },
                 "misleading_overclaims_to_avoid": {
                     "type": "array",
                     "items": {"type": "string"},
+                    "minItems": 2,
                 },
                 "strongest_positioning_angle": {"type": "string"},
             },
         },
-        "general_value_threshold": {
+        "missing_mental_models": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 10,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "mental_model",
+                    "why_required_before_role_work",
+                    "what_goes_wrong_without_it",
+                    "first_investigation_that_builds_it",
+                ],
+                "properties": {
+                    "mental_model": {"type": "string"},
+                    "why_required_before_role_work": {"type": "string"},
+                    "what_goes_wrong_without_it": {"type": "string"},
+                    "first_investigation_that_builds_it": {"type": "string"},
+                },
+            },
+        },
+        "general_engineering_value_threshold": {
             "type": "array",
             "minItems": 6,
             "maxItems": 14,
             "description": (
-                "MUST include BOTH general engineering value capabilities AND "
-                "role-specific capabilities. For adjacent-background / "
-                "production-engineering (Fluidstack-like) roles, general items "
-                "MUST cover: Linux/server fluency, Python automation, reproducible "
-                "environments, config/env vars, logging/errors, basic HTTP/API, "
-                "health checks, simple metrics, state machines, incident/debug "
-                "notes, and hardware telemetry concepts — before advanced role toys."
+                "Baseline capabilities for general credibility. Evidence fields MUST "
+                "name artifacts to build — never claim background experience as proof."
             ),
             "items": {
                 "type": "object",
@@ -187,34 +242,45 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "capability_scope",
                     "why_it_matters_generally",
                     "connected_role_problem",
-                    "evidence_that_proves_it",
+                    "artifact_evidence_required",
+                    "transferable_intuition_note",
                 ],
                 "properties": {
                     "capability": {"type": "string"},
                     "capability_scope": {
                         "type": "string",
-                        "description": (
-                            "Exactly one of: 'general_engineering' or 'role_specific'. "
-                            "Include a majority of general_engineering items first."
-                        ),
+                        "description": "'general_engineering' or 'role_specific'.",
                     },
                     "why_it_matters_generally": {"type": "string"},
                     "connected_role_problem": {"type": "string"},
-                    "evidence_that_proves_it": {"type": "string"},
+                    "artifact_evidence_required": {
+                        "type": "string",
+                        "description": (
+                            "Repo/README/log/demo/diagram required. NEVER 'proven by "
+                            "field/industrial experience'."
+                        ),
+                    },
+                    "transferable_intuition_note": {
+                        "type": "string",
+                        "description": (
+                            "What background intuition helps, and why it is still "
+                            "insufficient without an artifact."
+                        ),
+                    },
                 },
             },
         },
         "skill_dependency_graph": {
             "type": "array",
-            "minItems": 7,
-            "maxItems": 14,
+            "minItems": 8,
+            "maxItems": 16,
             "description": (
-                "LOW-LEVEL, realistic dependency order. Example chain for fleet/repair "
-                "roles: Python script → config/env vars → logging/errors → HTTP API → "
-                "Docker/reproducible env → health checks → metrics → state machine → "
-                "mocked telemetry → final repair pipeline. FORBIDDEN: jumping from "
-                "hardware failure modes straight to Kubernetes, or Redfish before "
-                "HTTP/health/metrics foundations."
+                "Problem/pain ordered — not tool shopping. Portability pain BEFORE "
+                "Docker. Docker is a mid-graph consequence of local env mismatch, "
+                "not Investigation 1. Example: software portability mental model → "
+                "Python automation → config/env → logging/errors → HTTP/API → "
+                "Why Docker exists → health checks → metrics → state machine → "
+                "mocked telemetry → repair pipeline."
             ),
             "items": {
                 "type": "object",
@@ -227,110 +293,166 @@ CONTRACT_JSON_SCHEMA: dict = {
                 ],
                 "properties": {
                     "skill_or_model": {"type": "string"},
-                    "depends_on": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Prior nodes in this graph only.",
-                    },
+                    "depends_on": {"type": "array", "items": {"type": "string"}},
                     "unlocks": {"type": "array", "items": {"type": "string"}},
-                    "why_it_comes_before_later_work": {"type": "string"},
+                    "why_it_comes_before_later_work": {
+                        "type": "string",
+                        "description": "Must cite engineering pain / dependency, not 'learn X'.",
+                    },
+                },
+            },
+        },
+        "roadmap_tracks": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["general_engineering_track", "role_specific_track"],
+            "properties": {
+                "general_engineering_track": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 4,
+                    "maxItems": 12,
+                    "description": (
+                        "Titles/ids of general-value investigations. Fluidstack-like: "
+                        "software portability; Python automation; config/env; "
+                        "logging/errors; APIs; Why Docker exists; health checks; metrics."
+                    ),
+                },
+                "role_specific_track": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                    "maxItems": 10,
+                    "description": (
+                        "Titles/ids of JD-specific investigations. Fluidstack-like: "
+                        "repair state machines; hardware telemetry; Redfish/BMC; "
+                        "GPU qualification; GPU repair pipeline simulation."
+                    ),
                 },
             },
         },
         "investigation_roadmap": {
             "type": "array",
-            "minItems": 5,
-            "maxItems": 8,
+            "minItems": 8,
+            "maxItems": 12,
             "description": (
-                "FOUNDATION-FIRST learning ladder starting from the candidate's "
-                "CURRENT capability level (adjacent software/systems value), NOT from "
-                "the final role domain. Must be CUMULATIVE: each investigation produces "
-                "an artifact used by the next. Before Redfish/BMC, Kubernetes, "
-                "Prometheus/Grafana, or GPU fleet simulation, include prerequisites: "
-                "reproducible execution; Python automation with config+logs; HTTP/API "
-                "if needed; health checks + failure states; workflow/state machines; "
-                "metrics and alerts; THEN mocked hardware telemetry; THEN final repair "
-                "pipeline simulation as the LAST investigation."
+                "Problem-first learning ladder. Investigation 1 for most "
+                "software/systems roles MUST be software portability / environment "
+                "mismatch WITHOUT Docker. Docker only later as 'Why does Docker "
+                "exist?'. Final role capstone last."
             ),
             "items": {
                 "type": "object",
                 "additionalProperties": False,
                 "required": [
                     "title",
+                    "track",
                     "expensive_problem",
                     "engineering_question",
-                    "mental_model_to_build",
-                    "principles",
-                    "technologies_introduced",
-                    "observe_existing_system",
+                    "why_matters_for_role",
+                    "phase_0_mental_model",
+                    "visual_system_model",
+                    "subquestions",
+                    "concepts_and_vocabulary",
+                    "engineering_principles",
+                    "technologies_involved",
+                    "observe_first",
                     "build_or_modify",
-                    "break_debug_improve",
-                    "evidence_output",
-                    "artifact_this_investigation_produces",
+                    "intentionally_break_debug",
+                    "improve",
+                    "github_evidence",
+                    "obsidian_engineering_page",
+                    "two_minute_explanation_target",
+                    "exit_criteria",
                     "builds_on_prior_artifact",
-                    "why_this_comes_now",
+                    "artifact_this_investigation_produces",
                 ],
                 "properties": {
                     "title": {"type": "string"},
+                    "track": {
+                        "type": "string",
+                        "description": "Exactly 'general' or 'role_specific'.",
+                    },
                     "expensive_problem": {"type": "string"},
-                    "engineering_question": {
+                    "engineering_question": {"type": "string"},
+                    "why_matters_for_role": {"type": "string"},
+                    "phase_0_mental_model": {
                         "type": "string",
-                        "description": "Prefer 'Why …?' form when possible.",
-                    },
-                    "mental_model_to_build": {"type": "string"},
-                    "principles": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "minItems": 1,
-                    },
-                    "technologies_introduced": {
-                        "type": "array",
-                        "items": {"type": "string"},
                         "description": (
-                            "Only technologies required NOW — never introduce K8s/"
-                            "Redfish/Prometheus in early investigations."
+                            "MULTI-PARAGRAPH / LAYERED (>=300 chars). Explain system "
+                            "layers or causal chain the learner must picture. Must use "
+                            "causal/layer language (at least two of: because, depends, "
+                            "layer, failure, assumption, runtime, dependency, "
+                            "environment, signal, state). Forbidden: one-sentence slogans."
                         ),
                     },
-                    "observe_existing_system": {"type": "string"},
+                    "visual_system_model": {
+                        "type": "string",
+                        "description": (
+                            "Describe a diagram the learner should sketch "
+                            "(boxes, arrows, failure points)."
+                        ),
+                    },
+                    "subquestions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 3,
+                        "maxItems": 8,
+                    },
+                    "concepts_and_vocabulary": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 3,
+                        "maxItems": 12,
+                    },
+                    "engineering_principles": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 2,
+                        "maxItems": 8,
+                    },
+                    "technologies_involved": {
+                        "type": "array",
+                        "description": (
+                            "Objects only. Empty allowed for early investigations. "
+                            "Never list a technology without engineering_pain_it_solves. "
+                            "Investigation 1 must NOT include Docker."
+                        ),
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["technology", "engineering_pain_it_solves"],
+                            "properties": {
+                                "technology": {"type": "string"},
+                                "engineering_pain_it_solves": {"type": "string"},
+                            },
+                        },
+                    },
+                    "observe_first": {"type": "string"},
                     "build_or_modify": {"type": "string"},
-                    "break_debug_improve": {"type": "string"},
-                    "evidence_output": {"type": "string"},
-                    "artifact_this_investigation_produces": {
-                        "type": "string",
-                        "description": (
-                            "Concrete artifact (repo folder, script, endpoint, diagram, "
-                            "log) that later investigations will extend."
-                        ),
+                    "intentionally_break_debug": {"type": "string"},
+                    "improve": {"type": "string"},
+                    "github_evidence": {"type": "string"},
+                    "obsidian_engineering_page": {"type": "string"},
+                    "two_minute_explanation_target": {"type": "string"},
+                    "exit_criteria": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 3,
+                        "maxItems": 8,
                     },
-                    "builds_on_prior_artifact": {
-                        "type": "string",
-                        "description": (
-                            "For investigation 1: 'none — starting artifact'. "
-                            "Otherwise name the prior artifact being extended."
-                        ),
-                    },
-                    "why_this_comes_now": {
-                        "type": "string",
-                        "description": (
-                            "Tie to candidate current level + why this unlocks the next "
-                            "step — not 'because the JD mentions it'."
-                        ),
-                    },
+                    "builds_on_prior_artifact": {"type": "string"},
+                    "artifact_this_investigation_produces": {"type": "string"},
                 },
             },
         },
         "proof_of_work_ladder": {
             "type": "array",
             "minItems": 5,
-            "maxItems": 8,
+            "maxItems": 10,
             "description": (
-                "ONE progressive system that grows over time — NOT disconnected "
-                "mini-projects. Each level EXTENDS the previous level of the same "
-                "repo/system. Example: L1 reproducible Python service → L2 "
-                "config/logging/errors → L3 health endpoint + failure states → "
-                "L4 repair state machine → L5 metrics/alerting → L6 mocked "
-                "Redfish/BMC telemetry → L7 final GPU repair pipeline simulation. "
-                "Final GPU repair pipeline is LAST only."
+                "ONE progressive system that grows. Capstone (e.g. GPU repair "
+                "pipeline simulation) is LAST only."
             ),
             "items": {
                 "type": "object",
@@ -347,26 +469,12 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "connected_investigations",
                 ],
                 "properties": {
-                    "level": {
-                        "type": "integer",
-                        "description": "1 = base system; higher = extensions; final = role sim.",
-                    },
+                    "level": {"type": "integer"},
                     "title": {"type": "string"},
                     "proves": {"type": "string"},
                     "scope": {"type": "string"},
-                    "extends_previous_level": {
-                        "type": "string",
-                        "description": (
-                            "Level 1: 'none — creates the system'. "
-                            "Else: what concrete capability is added onto the prior level."
-                        ),
-                    },
-                    "same_system_name": {
-                        "type": "string",
-                        "description": (
-                            "Stable name of the growing system/repo (same across all levels)."
-                        ),
-                    },
+                    "extends_previous_level": {"type": "string"},
+                    "same_system_name": {"type": "string"},
                     "evidence": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -385,68 +493,69 @@ CONTRACT_JSON_SCHEMA: dict = {
             "type": "object",
             "additionalProperties": False,
             "description": (
-                "Complete paste-ready Investigation 1 prompt. "
-                "EMPTY dependency_layers, subquestions, or "
-                "visual_resources_or_search_prompts is a schema FAILURE."
+                "Paste-ready Investigation 1. For software/systems roles: software "
+                "portability. FORBIDDEN: Docker, K8s, Prometheus, Grafana, Redfish "
+                "in this prompt."
             ),
             "required": [
                 "ready_to_paste_prompt",
                 "expensive_problem",
                 "engineering_question",
                 "phase_0_mental_model",
-                "dependency_layers",
+                "visual_system_model",
                 "subquestions",
-                "visual_resources_or_search_prompts",
-                "observe_build_improve_evidence_plan",
-                "reflection_question",
+                "concepts_and_vocabulary",
+                "observe_first",
+                "build_or_modify",
+                "intentionally_break_debug",
+                "improve",
+                "github_evidence",
+                "obsidian_engineering_page",
+                "two_minute_explanation_target",
+                "exit_criteria",
             ],
             "properties": {
                 "ready_to_paste_prompt": {
                     "type": "string",
                     "description": (
-                        "Full multi-paragraph prompt including expensive problem, "
-                        "engineering question, phase 0 mental model, dependency layers, "
-                        "subquestions, visual resources/search prompts, observe/build/"
-                        "improve/evidence plan, and reflection question."
+                        "Complete multi-section prompt including Phase 0 BEFORE build. "
+                        "Must not recommend Docker tutorials for Investigation 1."
                     ),
                 },
                 "expensive_problem": {"type": "string"},
                 "engineering_question": {"type": "string"},
-                "phase_0_mental_model": {"type": "string"},
-                "dependency_layers": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 3,
-                    "maxItems": 8,
+                "phase_0_mental_model": {
+                    "type": "string",
+                    "description": "Layered multi-paragraph mental model — not one sentence.",
                 },
+                "visual_system_model": {"type": "string"},
                 "subquestions": {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 3,
-                    "maxItems": 10,
                 },
-                "visual_resources_or_search_prompts": {
+                "concepts_and_vocabulary": {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 3,
-                    "maxItems": 8,
-                    "description": (
-                        "Concrete YouTube/search/diagram prompts — never empty."
-                    ),
                 },
-                "observe_build_improve_evidence_plan": {"type": "string"},
-                "reflection_question": {"type": "string"},
+                "observe_first": {"type": "string"},
+                "build_or_modify": {"type": "string"},
+                "intentionally_break_debug": {"type": "string"},
+                "improve": {"type": "string"},
+                "github_evidence": {"type": "string"},
+                "obsidian_engineering_page": {"type": "string"},
+                "two_minute_explanation_target": {"type": "string"},
+                "exit_criteria": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                },
             },
         },
         "evidence_plan": {
             "type": "object",
             "additionalProperties": False,
-            "description": (
-                "Every section MUST be non-empty with useful concrete items. "
-                "Empty arrays are a HARD FAILURE. For Fluidstack-like "
-                "production-engineering roles, include the foundation → final "
-                "ladder evidence listed in the system rules."
-            ),
             "required": [
                 "obsidian_pages",
                 "github_repos_or_folders",
@@ -460,58 +569,31 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 5,
-                    "maxItems": 12,
-                    "description": (
-                        "Named Engineering Pages. Fluidstack-like example set: "
-                        "Reproducible Execution; Python Automation with Config and Logs; "
-                        "Health Checks and Failure States; Metrics and Alerts; "
-                        "Repair State Machines; Mocked Hardware Telemetry; "
-                        "GPU Repair Pipeline Simulation."
-                    ),
                 },
                 "github_repos_or_folders": {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 2,
-                    "maxItems": 8,
-                    "description": (
-                        "Prefer folders/modules inside the ONE growing system repo, "
-                        "not disconnected projects."
-                    ),
                 },
                 "diagrams": {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 4,
-                    "maxItems": 10,
-                    "description": (
-                        "Fluidstack-like examples: dependency graph; service lifecycle "
-                        "diagram; health-check flow; repair state machine; metrics "
-                        "pipeline; mocked Redfish/BMC telemetry flow."
-                    ),
                 },
                 "benchmarks_or_logs": {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 4,
-                    "maxItems": 10,
-                    "description": (
-                        "Fluidstack-like examples: setup log; failure injection log; "
-                        "health-check test output; MTTD/MTTR measurement output; "
-                        "alert trigger log; return-to-service verification log."
-                    ),
                 },
                 "readme_sections": {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 4,
-                    "maxItems": 10,
                 },
                 "interview_artifacts": {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 3,
-                    "maxItems": 8,
                 },
             },
         },
@@ -519,13 +601,6 @@ CONTRACT_JSON_SCHEMA: dict = {
             "type": "array",
             "minItems": 5,
             "maxItems": 10,
-            "description": (
-                "Must include role-specific expectations when present in the JD. "
-                "For Fluidstack-like roles, MUST include separate rows for: "
-                "hardware telemetry / Redfish-BMC; fleet health thinking; "
-                "incident/postmortem discipline; repair pipeline tradeoffs "
-                "(plus foundation expectations as needed)."
-            ),
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -537,185 +612,182 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "how_to_answer_after_roadmap",
                 ],
                 "properties": {
-                    "expectation": {
+                    "expectation": {"type": "string"},
+                    "current_readiness": {"type": "string"},
+                    "evidence_needed": {
                         "type": "string",
-                        "description": (
-                            "Concrete expectation grounded in the JD or necessary "
-                            "foundation — not vague 'know automation'."
-                        ),
+                        "description": "Artifact-based evidence, not resume claims.",
                     },
-                    "current_readiness": {
-                        "type": "string",
-                        "description": "Honest readiness grounded in the profile only.",
-                    },
-                    "evidence_needed": {"type": "string"},
                     "likely_interview_challenge": {"type": "string"},
                     "how_to_answer_after_roadmap": {"type": "string"},
                 },
+            },
+        },
+        "guardrail_checks": {
+            "type": "object",
+            "additionalProperties": False,
+            "description": (
+                "Model self-check. Prefer true only when honestly satisfied. "
+                "Code validation comes in a later step."
+            ),
+            "required": [
+                "investigation_1_avoids_docker_k8s_prometheus_redfish",
+                "investigation_1_is_software_portability",
+                "docker_appears_only_after_portability_pain",
+                "mental_models_are_layered_not_one_liners",
+                "background_not_treated_as_software_evidence",
+                "capstone_is_last",
+                "technologies_tied_to_engineering_pain",
+                "notes",
+            ],
+            "properties": {
+                "investigation_1_avoids_docker_k8s_prometheus_redfish": {
+                    "type": "boolean",
+                },
+                "investigation_1_is_software_portability": {"type": "boolean"},
+                "docker_appears_only_after_portability_pain": {"type": "boolean"},
+                "mental_models_are_layered_not_one_liners": {"type": "boolean"},
+                "background_not_treated_as_software_evidence": {"type": "boolean"},
+                "capstone_is_last": {"type": "boolean"},
+                "technologies_tied_to_engineering_pain": {"type": "boolean"},
+                "notes": {"type": "array", "items": {"type": "string"}},
             },
         },
     },
 }
 
 
-SYSTEM_PROMPT = """You are Project Lambda — a Role-to-Roadmap Engine.
+SYSTEM_PROMPT = """You are Project Lambda — a problem-first engineering growth engine.
 
-PRODUCT SHAPE (critical)
-You are NOT a Problem-Solution Contract Generator.
-You are NOT a project generator that jumps from a JD to job-domain toys
-(Kubernetes, Redfish, GPU repair pipelines) in Investigation 1.
+YOU ARE NOT:
+- a course generator
+- a project generator
+- a keyword-to-curriculum generator
+- a resume coach
+- a study-plan writer that says "learn Docker / learn Kubernetes"
 
-You ARE an engineering-growth / learning-ladder system that translates a job
-description + engineer background into expensive problems, mental models, skill
-dependencies, a progressive investigation roadmap, a CUMULATIVE proof-of-work
-ladder (one system that grows), evidence, and interview readiness.
+YOU ARE:
+an engine that translates a job description + engineer background into:
+1) expensive engineering problems behind the role
+2) performance requirements
+3) surface keywords vs deep skills (pain behind the keyword)
+4) candidate transferable intuition (NOT evidence)
+5) missing mental models and missing artifact evidence
+6) general engineering value threshold (artifact evidence required)
+7) skill dependency graph ordered by pain / prerequisites
+8) roadmap tracks: general_engineering vs role_specific
+9) progressive investigations (Phase 0 mental model BEFORE build)
+10) cumulative proof-of-work ladder (one growing system)
+11) a paste-ready first investigation prompt
+12) evidence plan + interview readiness + honest guardrail_checks
 
-Start from the candidate's CURRENT capability level.
-For adjacent-background engineers (industrial / EE / field / partial software),
-establish general software/systems value BEFORE job-specific fleet work.
+CORE RULE — TECHNOLOGY IS A CONSEQUENCE OF PAIN
+Never introduce a technology before explaining the engineering pain that caused
+it to exist.
 
-Always ask: what must this engineer understand first before the role project
-is credible? The final GPU repair pipeline simulation is LAST, never early.
+Wrong: "Learn Docker."
+Right: "Software often fails when moved between machines because runtime,
+dependencies, config, filesystem paths, OS assumptions, and permissions differ.
+Docker later exists to reduce this environment mismatch."
 
-LEARNING PIPELINE (every investigation)
-Expensive Problem → Engineering Question → Mental Model → Engineering Principles
-→ Technologies (only as needed) → Observe Existing Systems → Build or Modify
-→ Break / Debug / Improve → Explain Tradeoffs → Produce Evidence
+Wrong: "Learn Kubernetes."
+Right: "Companies operate many services across many machines and must handle
+scheduling, failure, scaling, deployment, and recovery. Kubernetes exists to
+manage that operational complexity — only after those pains are understood."
 
-RULE A — FOUNDATION-FIRST
-Before Redfish/BMC, Kubernetes, Prometheus, Grafana, or GPU fleet simulation,
-the investigation_roadmap MUST include prerequisite investigations such as:
-1) Why does software need reproducible execution across machines?
-2) Python automation with config and logs
-3) HTTP/API basics if needed
-4) Health checks and failure states
-5) Workflow / state machines
-6) Metrics and alerts
-Only THEN: mocked hardware telemetry
-Only THEN: final GPU repair pipeline simulation (last investigation / last ladder level)
+INVESTIGATION CONTRACT (every investigation)
+Must follow this order in substance:
+1. Expensive engineering problem
+2. Primary engineering question
+3. Why this matters for the role
+4. Phase 0 — Mental model (LAYERED, multi-paragraph; causal chain / system layers)
+5. Visual system model (what to sketch)
+6. Subquestions
+7. Concepts and vocabulary
+8. Engineering principles
+9. Technologies involved ONLY as objects with engineering_pain_it_solves
+   (empty array allowed when no new tools are needed yet)
+10. Observe first
+11. Build or modify
+12. Intentionally break / debug
+13. Improve
+14. GitHub evidence
+15. Obsidian Engineering Page
+16. Two-minute explanation target
+17. Exit criteria
 
-RULE B — DEPENDENCY GRAPH
-Skill dependencies must be low-level and realistic.
-Good chain example:
-Python script → config/env vars → logging/errors → HTTP API → Docker/reproducible
-env → health checks → metrics → state machine → mocked telemetry → final repair
-pipeline.
-FORBIDDEN: hardware failure modes → Kubernetes jumps; Redfish before HTTP/health;
-Prometheus before a process that emits logs/events; disconnected tech islands.
+Mental model BEFORE implementation. No one-sentence mental models.
+Each phase_0_mental_model must be >=300 characters and use causal/layer language
+(at least two of: because, depends, layer, failure, assumption, runtime,
+dependency, environment, signal, state).
 
-RULE C — CUMULATIVE PROOF LADDER
-proof_of_work_ladder is ONE progressive system that grows over time — not
-disconnected mini-projects. Each level EXTENDS the previous level of the SAME
-system (same_system_name stable across levels).
-Example:
-Level 1: reproducible Python service
-Level 2: add config / logging / errors
-Level 3: add health endpoint and failure states
-Level 4: add repair state machine
-Level 5: add metrics and alerting
-Level 6: add mocked Redfish/BMC telemetry
-Level 7: final GPU repair pipeline simulation
-investigation_roadmap must also be cumulative: each produces
-artifact_this_investigation_produces that the next builds_on_prior_artifact.
+DOCKER / EARLY-TOOL RULE (critical)
+For most software/systems roles, Investigation 1 MUST be:
+  "How does software go from one machine to another and still work?"
+Cover: code, runtime, dependencies, env vars, filesystem assumptions, OS
+assumptions, permissions, Git, README/setup, failure modes.
+Investigation 1 MUST NOT introduce Docker, Kubernetes, Prometheus, Grafana,
+Redfish, or BMC.
+Docker may appear ONLY later as an investigation titled like
+  "Why does Docker exist?"
+after the learner has felt local portability / environment mismatch pain.
 
-RULE D — FIRST INVESTIGATION PROMPT
-first_investigation_prompt MUST include non-empty:
-- expensive problem
-- engineering question
-- phase 0 mental model
-- dependency_layers (min 3)
-- subquestions (min 3)
-- visual_resources_or_search_prompts (min 3 concrete search/video/diagram prompts)
-- observe/build/improve/evidence plan
-- reflection question
-Empty lists are a HARD FAILURE. ready_to_paste_prompt must include all of the above.
+CANDIDATE EVIDENCE RULE
+Never treat background experience as software proof.
+Field/industrial/hardware intuition transfers — but Linux fluency, Python
+automation, APIs, Docker, etc. still require artifacts (repo, setup log, README,
+shell notes, troubleshooting notes, diagrams, benchmarks).
 
-RULE E — GENERAL VALUE THRESHOLD
-Include BOTH capability_scope='general_engineering' AND 'role_specific'.
-For Fluidstack-like production engineering roles, general_engineering MUST cover:
-Linux/server fluency, Python automation, reproducible environments, config/env
-vars, logging/errors, basic HTTP/API understanding, health checks, simple metrics,
-state machines, incident/debug notes, hardware telemetry concepts.
-Role-specific items come after those foundations are listed.
+ROADMAP TRACKS
+general_engineering_track: broad engineering value
+  (portability, Python automation, config/logs, APIs, Why Docker, health, metrics)
+role_specific_track: JD specialization
+  (repair state machines, hardware telemetry, Redfish/BMC, GPU qualification,
+   GPU repair pipeline simulation as CAPSTONE last)
 
-RULE F — AUTOMATION LANGUAGE
-Never use absolute "fully automated" / "full automation" wording in
-role_interpretation, success criteria, investigations, proof ladder, or interview
-answers. Prefer:
-"highly automated common repair paths with explicit human escalation for
-ambiguous, unsafe, or failed recovery states."
+PROOF LADDER
+One progressive system (same_system_name). Capstone last.
+Prefer highly automated common repair paths with explicit human escalation —
+never "fully automated".
 
-RULE G — EVIDENCE PLAN (never empty)
-Every evidence_plan section MUST have useful non-empty items:
-obsidian_pages, github_repos_or_folders, diagrams, benchmarks_or_logs,
-readme_sections, interview_artifacts.
-For Fluidstack-like roles, Obsidian pages should include:
-Reproducible Execution; Python Automation with Config and Logs; Health Checks
-and Failure States; Metrics and Alerts; Repair State Machines; Mocked Hardware
-Telemetry; GPU Repair Pipeline Simulation.
-Diagrams should include: dependency graph; service lifecycle diagram;
-health-check flow; repair state machine; metrics pipeline; mocked Redfish/BMC
-telemetry flow.
-Benchmarks/logs should include: setup log; failure injection log; health-check
-test output; MTTD/MTTR measurement output; alert trigger log;
-return-to-service verification log.
-
-RULE H — INTERVIEW READINESS
-When the JD includes fleet/repair/telemetry themes, interview_readiness_map
-MUST include role-specific expectations for:
-- hardware telemetry / Redfish-BMC
-- fleet health thinking
-- incident/postmortem discipline
-- repair pipeline tradeoffs
-Do not only list generic "automation" / "API" soft expectations.
-
-ANTI-PATTERNS (failures)
-- Investigation 1 about hardware failure modes / K8s / Redfish / fleet repair
-- Disconnected mini-projects (new repo every level)
-- Generic study plans or course recommendations
-- Learning technologies in isolation
-- Inventing candidate experience or employer metrics
-- Empty first-investigation arrays
-- Empty evidence_plan sections
-- Absolute "fully automated" language
-- Final repair pipeline appearing before foundation layers
-- Regressing to project-first output (skipping the learning ladder)
-
-CANDIDATE TRANSLATION
-Translate the profile honestly. Transferable strengths need profile anchors.
-Real gaps: what blocks credibility + what mental model/principle comes first.
+FLUIDSTACK-LIKE PROGRESSION (adapt titles; keep order spirit)
+1. How does software move between machines and still work? (NO Docker)
+2. Python automation with config, logs, clear failure modes
+3. Why do services expose APIs?
+4. Why does Docker exist?
+5. Why do production systems need health checks?
+6. Why do metrics and alerts exist?
+7. Why does repair become a state machine?
+8. How does hardware telemetry expose fleet health? (mocked Redfish/BMC concepts)
+9. How would a GPU repair pipeline simulation work?
+10. Capstone: GPU Repair Pipeline Simulation (last)
 
 OUTPUT
 Match the JSON schema exactly.
-Keep the foundation-first investigation roadmap as a learning ladder.
-Do not regress to project-first generation.
-Be progressive, cumulative, and grounded in the candidate's actual starting level.
+Fill guardrail_checks honestly.
+Be concrete, problem-first, and cumulative.
 """
 
 
 def build_user_prompt(job_description: str, engineer_profile: str) -> str:
-    return f"""Translate this role into a Foundation-First Role-to-Roadmap for this engineer.
+    return f"""Generate a Project Lambda Role-to-Roadmap for this engineer.
 
-Critical priorities:
-1. Start investigations from THIS candidate's current capability level — not the
-   final JD domain. Keep the learning ladder; do NOT regress to project-first.
-2. For adjacent-background engineers, establish general software/systems value
-   before fleet/GPU/Redfish/K8s work.
-3. Make the roadmap cumulative: each investigation's artifact becomes input to
-   the next.
-4. Skill dependency graph must be low-level (Python → config → logs → HTTP →
-   Docker → health → metrics → state machine → mocked telemetry → final pipeline).
-5. Proof-of-work ladder = ONE growing system (same_system_name). Final GPU repair
-   pipeline simulation is LAST only. Prefer highly automated common repair paths
-   with explicit human escalation — NEVER "fully automated".
-6. general_value_threshold: both general_engineering and role_specific.
-7. first_investigation_prompt: NO empty lists (min 3 each for dependencies,
-   subquestions, visual prompts).
-8. evidence_plan: EVERY section non-empty with useful items (Obsidian pages,
-   diagrams, benchmarks/logs per Fluidstack-like examples in the rules).
-9. interview_readiness_map: when JD includes them, include Redfish-BMC / hardware
-   telemetry, fleet health thinking, incident/postmortem discipline, and repair
-   pipeline tradeoffs.
+Hard requirements for THIS run:
+1. Investigation 1 = software portability / environment mismatch. NO Docker.
+2. Docker only later as "Why does Docker exist?" after portability pain.
+3. Every investigation: layered Phase 0 mental model (>=300 chars) that includes
+   at least two of these exact words/stems in natural sentences: because, depends,
+   layer, failure, assumption, runtime, dependency, environment, signal, state.
+   Also include visual model + subquestions BEFORE build; technologies as
+   {{technology, engineering_pain_it_solves}} objects.
+4. Separate candidate transferable intuition from missing artifact evidence.
+5. Fill roadmap_tracks (general vs role_specific).
+6. Fill missing_mental_models and performance_requirements.
+7. Capstone / GPU repair pipeline simulation MUST be the FINAL investigation
+   and the FINAL proof-of-work ladder level — never in the middle.
+8. first_investigation_prompt must be paste-ready with Phase 0 before build;
+   no Docker beginner tutorials; include observe/build/break/improve/GitHub/Obsidian.
+9. Fill guardrail_checks honestly.
 
 === JOB DESCRIPTION ===
 {job_description.strip()}
@@ -723,5 +795,5 @@ Critical priorities:
 === ENGINEER PROFILE / BACKGROUND ===
 {engineer_profile.strip()}
 
-Produce the structured Role-to-Roadmap JSON now.
+Produce the structured Project Lambda JSON now.
 """
