@@ -175,6 +175,56 @@ CAPSTONE_DELTA_TERMS = (
     "benchmark",
 )
 
+ABSOLUTE_AUTOMATION_PHRASES = (
+    "fully automated",
+    "fully-automated",
+    "no humans needed",
+    "no human needed",
+    "complete automation",
+    "automated everything",
+    "automate everything",
+    "without any human",
+    "zero human",
+)
+
+AUTOMATION_BOUNDARY_PAIRS = (
+    "escalat",
+    "human",
+    "fail-closed",
+    "fail closed",
+    "approval",
+    "boundary",
+    "common path",
+    "common-path",
+    "manual",
+)
+
+OPS_METRIC_TERMS = (
+    "mttd",
+    "mttr",
+    "return to service",
+    "return-to-service",
+    "time to return",
+    "mean time",
+    "false positive",
+    "false negative",
+    "escalation rate",
+    "queue depth",
+    "telemetry freshness",
+    "alert noise",
+)
+
+DOCKER_ARTIFACT_TERMS = (
+    "dockerfile",
+    "docker-compose",
+    "docker compose",
+    "containerization",
+    "docker-portability",
+    "docker_portability",
+    "containerization-tradeoffs",
+    "containerization_tradeoffs",
+)
+
 
 class ValidationError(Exception):
     """Raised when a roadmap violates Project Lambda semantic rules."""
@@ -698,6 +748,224 @@ def validate_roadmap(data: dict[str, Any]) -> None:
                 f"Investigation {i} ({inv.get('title', '')}) missing "
                 "delta_from_previous_investigation."
             )
+
+    # 15. Reject absolute automation language unless paired with boundaries
+    text_blobs: list[tuple[str, str]] = []
+    role = data.get("role_interpretation")
+    if isinstance(role, dict):
+        text_blobs.append(
+            ("role_interpretation.what_success_looks_like", str(role.get("what_success_looks_like") or ""))
+        )
+        text_blobs.append(("role_interpretation.real_mission", str(role.get("real_mission") or "")))
+        for claim in role.get("role_signature_claims") or []:
+            text_blobs.append(("role_signature_claims", str(claim)))
+    if isinstance(cumulative, dict):
+        text_blobs.append(
+            ("cumulative_system.final_capstone_shape", str(cumulative.get("final_capstone_shape") or ""))
+        )
+        text_blobs.append(
+            ("cumulative_system.system_purpose", str(cumulative.get("system_purpose") or ""))
+        )
+    for inv in investigations:
+        text_blobs.append(
+            (
+                f"investigation:{inv.get('title', '')}",
+                _join_fields(
+                    inv,
+                    (
+                        "expensive_problem",
+                        "build_or_modify",
+                        "improve",
+                        "capstone_delta",
+                        "artifact_this_investigation_produces",
+                    ),
+                ),
+            )
+        )
+
+    for label, text in text_blobs:
+        low = _lower(text)
+        hits = [p for p in ABSOLUTE_AUTOMATION_PHRASES if p in low]
+        if not hits:
+            continue
+        has_boundary = any(b in low for b in AUTOMATION_BOUNDARY_PAIRS)
+        if not has_boundary:
+            failures.append(
+                f"Absolute automation language without escalation/boundary framing "
+                f"in {label}: {', '.join(hits)}."
+            )
+
+    # 16. Operational metrics required for production/ops roadmaps
+    metrics = data.get("operational_metrics_contract")
+    if not isinstance(metrics, list) or len(metrics) < 5:
+        failures.append(
+            "operational_metrics_contract is missing or too thin "
+            "(need >=5 measurable ops metrics)."
+        )
+    else:
+        metrics_blob = _lower(
+            " ".join(
+                str(m.get("metric", "")) + " " + str(m.get("how_to_measure_in_the_project", ""))
+                for m in metrics
+                if isinstance(m, dict)
+            )
+        )
+        if not _contains_any(metrics_blob, OPS_METRIC_TERMS):
+            failures.append(
+                "operational_metrics_contract lacks production ops metrics "
+                "(expected MTTD, MTTR / return-to-service, FP/FN, queue depth, "
+                "escalation rate, telemetry freshness, or alert noise)."
+            )
+        has_mttd = "mttd" in metrics_blob or "mean time to detect" in metrics_blob
+        has_mttr = (
+            "mttr" in metrics_blob
+            or "mean time to repair" in metrics_blob
+            or "return to service" in metrics_blob
+            or "return-to-service" in metrics_blob
+            or "time to return" in metrics_blob
+        )
+        if not (has_mttd and has_mttr):
+            failures.append(
+                "operational_metrics_contract must include both MTTD and MTTR "
+                "(or return-to-service timing)."
+            )
+
+    # 17. Automation boundaries required
+    boundaries = data.get("automation_boundaries")
+    if not isinstance(boundaries, dict):
+        failures.append("automation_boundaries is missing.")
+    else:
+        for key, min_n in (
+            ("safe_to_automate", 3),
+            ("requires_human_escalation", 3),
+            ("fail_closed_conditions", 2),
+            ("manual_approval_gates", 2),
+        ):
+            vals = boundaries.get(key) or []
+            if not isinstance(vals, list) or len(vals) < min_n:
+                failures.append(
+                    f"automation_boundaries.{key} needs >= {min_n} concrete items."
+                )
+
+    # 18. Capstone proof contract must include MTTD/MTTR-like measurements
+    proof = data.get("capstone_proof_contract")
+    if not isinstance(proof, dict):
+        failures.append("capstone_proof_contract is missing.")
+    else:
+        measurements = " ".join(str(x) for x in (proof.get("required_measurements") or []))
+        injections = proof.get("required_failure_injections") or []
+        docs = " ".join(str(x) for x in (proof.get("required_docs") or []))
+        demo = " ".join(str(x) for x in (proof.get("what_it_must_demonstrate") or []))
+        readout = str(proof.get("hiring_manager_readout") or "")
+        meas_l = _lower(measurements + " " + demo + " " + capstone_delta)
+        if "mttd" not in meas_l and "mean time to detect" not in meas_l:
+            failures.append(
+                "capstone_proof_contract / capstone must include MTTD "
+                "(or mean time to detect) measurement."
+            )
+        if (
+            "mttr" not in meas_l
+            and "mean time to repair" not in meas_l
+            and "return to service" not in meas_l
+            and "return-to-service" not in meas_l
+            and "time to return" not in meas_l
+        ):
+            failures.append(
+                "capstone_proof_contract / capstone must include MTTR "
+                "(or return-to-service) measurement."
+            )
+        if not isinstance(injections, list) or len(injections) < 3:
+            failures.append(
+                "capstone_proof_contract.required_failure_injections needs >=3 cases."
+            )
+        docs_l = _lower(docs)
+        if "postmortem" not in docs_l and "incident" not in docs_l:
+            failures.append(
+                "capstone_proof_contract.required_docs must include incident/postmortem evidence."
+            )
+        if "verification" not in docs_l:
+            failures.append(
+                "capstone_proof_contract.required_docs must include a verification log."
+            )
+        if len(readout.strip()) < 80:
+            failures.append(
+                "capstone_proof_contract.hiring_manager_readout is missing or too short."
+            )
+
+    # 19. Docker investigation must add a Docker artifact to the same system
+    docker_invs = [
+        inv
+        for inv in investigations
+        if "docker" in _lower(str(inv.get("title") or ""))
+    ]
+    if docker_invs:
+        growth_blob = ""
+        if isinstance(cumulative, dict):
+            growth_blob = _lower(
+                " ".join(
+                    str(g.get("folder_or_module_added", ""))
+                    + " "
+                    + str(g.get("capability_added", ""))
+                    + " "
+                    + str(g.get("evidence_created", ""))
+                    for g in (cumulative.get("repo_growth_model") or [])
+                    if isinstance(g, dict)
+                )
+            )
+        ladder_blob = _lower(
+            " ".join(
+                str(level.get("module_or_folder_added", ""))
+                + " "
+                + str(level.get("title", ""))
+                + " "
+                + str(level.get("new_capability_added", ""))
+                for level in ladder
+                if isinstance(level, dict)
+            )
+        )
+        inv_blob = _lower(
+            " ".join(
+                str(inv.get("module_or_folder_added", ""))
+                + " "
+                + str(inv.get("artifact_this_investigation_produces", ""))
+                for inv in docker_invs
+            )
+        )
+        combined = growth_blob + " " + ladder_blob + " " + inv_blob
+        if not _contains_any(combined, DOCKER_ARTIFACT_TERMS):
+            failures.append(
+                "Docker investigation exists but no Docker artifact/module appears in "
+                "cumulative_system / proof ladder (expected Dockerfile, docker-compose, "
+                "or docker portability/containerization docs in the same repo)."
+            )
+
+    # 20. Role signature claims should be present and non-generic
+    if isinstance(role, dict):
+        claims = role.get("role_signature_claims") or []
+        if not isinstance(claims, list) or len(claims) < 4:
+            failures.append(
+                "role_interpretation.role_signature_claims needs >=4 sharp claims."
+            )
+        else:
+            generic_hits = 0
+            for claim in claims:
+                c = _lower(str(claim))
+                if any(
+                    g in c
+                    for g in (
+                        "responsible for",
+                        "work with stakeholders",
+                        "cross-functional",
+                        "strong communication",
+                        "team player",
+                    )
+                ):
+                    generic_hits += 1
+            if generic_hits >= 2:
+                failures.append(
+                    "role_signature_claims look like generic job-summary language; "
+                    "need sharp engineering truths."
+                )
 
     if failures:
         bullet = "\n".join(f"- {f}" for f in failures)

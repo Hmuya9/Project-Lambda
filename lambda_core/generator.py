@@ -140,6 +140,9 @@ REQUIRED_TOP_LEVEL = [
     "proof_of_work_ladder",
     "first_investigation_prompt",
     "evidence_plan",
+    "operational_metrics_contract",
+    "automation_boundaries",
+    "capstone_proof_contract",
     "interview_readiness_map",
     "guardrail_checks",
 ]

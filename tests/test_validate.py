@@ -181,7 +181,21 @@ Engineering page: Software Portability.
         paste += "\nAdditional notes on portability failure modes and layer assumptions."
 
     return {
-        "role_interpretation": {},
+        "role_interpretation": {
+            "one_liner": "Fleet repair ops engineer",
+            "real_mission": "Turn GPU failure into a measured repair pipeline.",
+            "what_success_looks_like": (
+                "Common-path repair automation with escalation for unsafe states "
+                "and fail-closed behavior when recovery is ambiguous."
+            ),
+            "what_this_role_is_not": ["ticket closer", "YAML-only ops"],
+            "role_signature_claims": [
+                "GPU failure is not a ticket; it is a fleet throughput problem.",
+                "Repair must become a pipeline, not a manual procedure.",
+                "Health visibility must come from real signals, not vibes.",
+                "Automation must know when to stop and escalate.",
+            ],
+        },
         "expensive_problem_map": [],
         "performance_requirements": [],
         "surface_keywords_vs_deep_skills": [],
@@ -225,7 +239,10 @@ Engineering page: Software Portability.
             "system_purpose": "Grow one fleet repair simulation system.",
             "why_this_system_matches_the_role": "Mirrors GPU fleet repair operations.",
             "starting_scope": "portable machine report script",
-            "final_capstone_shape": "verified repair pipeline with postmortem evidence",
+            "final_capstone_shape": (
+                "Verified repair pipeline with explicit escalation boundaries, "
+                "failure injection, and postmortem evidence."
+            ),
             "suggested_repo_name": "fleet-repair-lab",
             "repo_growth_model": [
                 {
@@ -310,6 +327,87 @@ Engineering page: Software Portability.
             "benchmarks_or_logs": ["b1", "b2", "b3", "b4"],
             "readme_sections": ["r1", "r2", "r3", "r4"],
             "interview_artifacts": ["i1", "i2", "i3"],
+        },
+        "operational_metrics_contract": [
+            {
+                "metric": "MTTD",
+                "why_it_matters": "Fast detection protects fleet throughput.",
+                "how_to_measure_in_the_project": "Timestamp detect vs inject.",
+                "what_bad_result_means": "Blind spots in telemetry.",
+            },
+            {
+                "metric": "MTTR",
+                "why_it_matters": "Return-to-service speed.",
+                "how_to_measure_in_the_project": "Timestamp repair start to green check.",
+                "what_bad_result_means": "Stuck repair queue.",
+            },
+            {
+                "metric": "false positive rate",
+                "why_it_matters": "Noise burns operators.",
+                "how_to_measure_in_the_project": "Count bad alerts / total alerts.",
+                "what_bad_result_means": "Alert fatigue.",
+            },
+            {
+                "metric": "escalation rate",
+                "why_it_matters": "Shows automation boundaries working.",
+                "how_to_measure_in_the_project": "Escalated / total repairs.",
+                "what_bad_result_means": "Automation too aggressive or too timid.",
+            },
+            {
+                "metric": "return-to-service pass rate",
+                "why_it_matters": "Prevents reintroducing bad hosts.",
+                "how_to_measure_in_the_project": "Pass vs fail after repair.",
+                "what_bad_result_means": "Weak verification gate.",
+            },
+        ],
+        "automation_boundaries": {
+            "safe_to_automate": [
+                "collect logs",
+                "isolate known-safe failure codes",
+                "open repair tickets with context",
+            ],
+            "requires_human_escalation": [
+                "ambiguous thermal signals",
+                "firmware flash decisions",
+                "unsafe recovery loops",
+            ],
+            "fail_closed_conditions": [
+                "missing telemetry freshness",
+                "conflicting health signals",
+            ],
+            "manual_approval_gates": [
+                "return host to production",
+                "apply destructive repair action",
+            ],
+        },
+        "capstone_proof_contract": {
+            "what_it_must_demonstrate": [
+                "failure injection discipline",
+                "measured MTTD/MTTR",
+                "escalation boundaries",
+                "verification before return-to-service",
+            ],
+            "required_failure_injections": [
+                "missing dependency",
+                "stale telemetry",
+                "failed return-to-service check",
+            ],
+            "required_measurements": [
+                "MTTD for injected faults",
+                "MTTR / return-to-service time",
+                "false positive notes",
+            ],
+            "required_docs": [
+                "docs/verification-log.md",
+                "docs/incident-postmortem.md",
+                "README architecture tradeoffs",
+                "architecture diagram",
+            ],
+            "hiring_manager_readout": (
+                "I built one fleet-repair lab that starts with portability and grows "
+                "into a repair pipeline with measured MTTD/MTTR, explicit escalation, "
+                "and a postmortem proving failure was injected and verified."
+            ),
         },
         "interview_readiness_map": [
             {

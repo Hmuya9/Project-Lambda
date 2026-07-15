@@ -23,6 +23,9 @@ CONTRACT_JSON_SCHEMA: dict = {
         "proof_of_work_ladder",
         "first_investigation_prompt",
         "evidence_plan",
+        "operational_metrics_contract",
+        "automation_boundaries",
+        "capstone_proof_contract",
         "interview_readiness_map",
         "guardrail_checks",
     ],
@@ -35,6 +38,7 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "real_mission",
                 "what_success_looks_like",
                 "what_this_role_is_not",
+                "role_signature_claims",
             ],
             "properties": {
                 "one_liner": {"type": "string"},
@@ -42,9 +46,11 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "what_success_looks_like": {
                     "type": "string",
                     "description": (
-                        "Never say 'fully automated'. Prefer highly automated common "
-                        "paths with explicit human escalation for ambiguous, unsafe, "
-                        "or failed recovery states."
+                        "FORBIDDEN: 'fully automated', 'no humans needed', "
+                        "'complete automation', 'automated everything'. "
+                        "REQUIRED framing: common-path automation with escalation "
+                        "for unsafe/ambiguous states, human review gates, "
+                        "fail-closed behavior, explicit repair-pipeline boundaries."
                     ),
                 },
                 "what_this_role_is_not": {
@@ -52,6 +58,21 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "items": {"type": "string"},
                     "minItems": 2,
                     "maxItems": 6,
+                },
+                "role_signature_claims": {
+                    "type": "array",
+                    "minItems": 4,
+                    "maxItems": 8,
+                    "description": (
+                        "Sharp engineering truths of THIS job — not generic summaries. "
+                        "Fluidstack-like examples: 'GPU failure is not a ticket; it is a "
+                        "fleet throughput problem.'; 'Repair must become a pipeline, not "
+                        "a manual procedure.'; 'Health visibility must come from real "
+                        "signals, not vibes.'; 'Hardware qualification must define "
+                        "production-ready before the fleet goes live.'; 'Automation "
+                        "must know when to stop and escalate.'"
+                    ),
+                    "items": {"type": "string"},
                 },
             },
         },
@@ -535,9 +556,10 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "capstone_delta": {
                         "type": "string",
                         "description": (
-                            "For final investigation ONLY: what new operational proof "
-                            "beyond prior integration (failure injection, MTTD/MTTR, "
-                            "false positives, escalation boundaries, postmortem). "
+                            "For final investigation ONLY: must literally include "
+                            "'failure injection' and 'MTTD' and 'MTTR' (or "
+                            "'return-to-service') and 'postmortem' or 'verification'. "
+                            "Explain NEW proof beyond prior integration. "
                             "For non-final: 'n/a — not the capstone'."
                         ),
                     },
@@ -699,8 +721,10 @@ CONTRACT_JSON_SCHEMA: dict = {
                         "final_folder_structure": {
                             "type": "string",
                             "description": (
-                                "Text tree of the ONE repo (README, docs/, src/, tests/, "
-                                "outputs/). Not a list of multiple repos."
+                                "Multi-line text tree of the ONE repo (>=80 chars), e.g. "
+                                "fleet-repair-lab/\\n├── README.md\\n├── docs/\\n├── src/\\n"
+                                "├── Dockerfile\\n├── tests/\\n└── outputs/. "
+                                "Not a list of multiple repos."
                             ),
                         },
                         "evidence_files": {
@@ -738,6 +762,117 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 3,
+                },
+            },
+        },
+        "operational_metrics_contract": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 12,
+            "description": (
+                "Ops credibility metrics for production/GPU infrastructure roles. "
+                "Prefer MTTD, MTTR/time to return to service, false positive/negative "
+                "rate, repair queue depth, escalation rate, return-to-service pass rate, "
+                "telemetry freshness, alert noise rate."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "metric",
+                    "why_it_matters",
+                    "how_to_measure_in_the_project",
+                    "what_bad_result_means",
+                ],
+                "properties": {
+                    "metric": {"type": "string"},
+                    "why_it_matters": {"type": "string"},
+                    "how_to_measure_in_the_project": {"type": "string"},
+                    "what_bad_result_means": {"type": "string"},
+                },
+            },
+        },
+        "automation_boundaries": {
+            "type": "object",
+            "additionalProperties": False,
+            "description": (
+                "Explicit judgment about what the cumulative system may automate vs "
+                "must escalate. Required for production/ops roles."
+            ),
+            "required": [
+                "safe_to_automate",
+                "requires_human_escalation",
+                "fail_closed_conditions",
+                "manual_approval_gates",
+            ],
+            "properties": {
+                "safe_to_automate": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                },
+                "requires_human_escalation": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                },
+                "fail_closed_conditions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 2,
+                },
+                "manual_approval_gates": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 2,
+                },
+            },
+        },
+        "capstone_proof_contract": {
+            "type": "object",
+            "additionalProperties": False,
+            "description": (
+                "Capstone must prove readiness — not 'integrate everything'. "
+                "Must cover failure injection, verification logs, MTTD/MTTR, "
+                "escalation cases, FP/FN notes, postmortem, README, architecture "
+                "diagram, two-minute hiring-manager explanation."
+            ),
+            "required": [
+                "what_it_must_demonstrate",
+                "required_failure_injections",
+                "required_measurements",
+                "required_docs",
+                "hiring_manager_readout",
+            ],
+            "properties": {
+                "what_it_must_demonstrate": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 4,
+                },
+                "required_failure_injections": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                },
+                "required_measurements": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                    "description": "Must include MTTD and MTTR (or time-to-return-to-service).",
+                },
+                "required_docs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 4,
+                    "description": (
+                        "Include verification log, incident postmortem, README tradeoff "
+                        "section, architecture diagram note."
+                    ),
+                },
+                "hiring_manager_readout": {
+                    "type": "string",
+                    "description": "Two-minute skeptical hiring-manager explanation.",
                 },
             },
         },
@@ -783,6 +918,8 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "capstone_is_last",
                 "technologies_tied_to_engineering_pain",
                 "one_cumulative_system_not_many_repos",
+                "avoids_blind_full_automation_language",
+                "has_operational_metrics_and_automation_boundaries",
                 "notes",
             ],
             "properties": {
@@ -796,6 +933,10 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "capstone_is_last": {"type": "boolean"},
                 "technologies_tied_to_engineering_pain": {"type": "boolean"},
                 "one_cumulative_system_not_many_repos": {"type": "boolean"},
+                "avoids_blind_full_automation_language": {"type": "boolean"},
+                "has_operational_metrics_and_automation_boundaries": {
+                    "type": "boolean",
+                },
                 "notes": {"type": "array", "items": {"type": "string"}},
             },
         },
@@ -910,17 +1051,35 @@ Each ladder level adds module_or_folder_added + new_capability_added +
 what_new_proof_it_creates + why_this_is_not_a_separate_project.
 evidence_plan.github_repository describes ONE repo tree (README, docs/, src/,
 tests/, outputs/) — never a list of many repos.
-Capstone is the mature version of the SAME repo. Capstone MUST include a real
-capstone_delta: failure injection, MTTD/MTTR, false-positive notes, escalation
-boundaries, verification log, postmortem — not a duplicate of the prior step.
-Prefer highly automated common repair paths with explicit human escalation —
-never "fully automated".
+Capstone is the mature version of the SAME repo.
+
+DOCKER MODULE CONSISTENCY
+If an investigation is "Why does Docker exist?", cumulative_system.repo_growth_model
+AND proof_of_work_ladder MUST include a Docker-related artifact in the SAME repo,
+e.g. Dockerfile, docker-compose.yml, docs/docker-portability-notes.md, or
+docs/containerization-tradeoffs.md. Never a separate Docker project.
+
+OPERATIONAL CREDIBILITY (critical)
+Fill role_interpretation.role_signature_claims with sharp role truths (not job
+summaries). Example style: "GPU failure is not a ticket; it is a fleet throughput
+problem."
+Fill operational_metrics_contract with measurable ops metrics (MTTD, MTTR /
+return-to-service, FP/FN rates, queue depth, escalation rate, alert noise, etc.).
+Fill automation_boundaries: safe_to_automate, requires_human_escalation,
+fail_closed_conditions, manual_approval_gates.
+Fill capstone_proof_contract with failure injections, MTTD/MTTR measurements,
+verification/postmortem docs, and a hiring_manager_readout.
+FORBIDDEN absolute automation language anywhere:
+  "fully automated", "no humans needed", "complete automation", "automated everything"
+REQUIRED framing instead:
+  common-path automation, escalation for unsafe/ambiguous states, human review
+  gates, fail-closed behavior, repair pipeline with explicit boundaries.
 
 FLUIDSTACK-LIKE PROGRESSION (adapt titles; keep order spirit)
 1. How does software move between machines and still work? (NO Docker) [general]
 2. Python automation with config, logs, clear failure modes [general]
 3. Why do services expose APIs? [general]
-4. Why does Docker exist? [general]
+4. Why does Docker exist? [general] + Dockerfile (or equivalent) in same repo
 5. Why do production systems need health checks? [general]
 6. Why do metrics and alerts exist? [general]
 7. Why does repair become a state machine? [role_specific]
@@ -930,8 +1089,8 @@ FLUIDSTACK-LIKE PROGRESSION (adapt titles; keep order spirit)
 
 OUTPUT
 Match the JSON schema exactly.
-Fill guardrail_checks honestly (including one_cumulative_system_not_many_repos).
-Be concrete, problem-first, and cumulative.
+Fill guardrail_checks honestly.
+Be concrete, problem-first, cumulative, and hiring-manager credible.
 """
 
 
@@ -940,28 +1099,29 @@ def build_user_prompt(job_description: str, engineer_profile: str) -> str:
 
 Hard requirements for THIS run:
 1. Investigation 1 = software portability / environment mismatch. NO Docker.
-2. Docker only later as "Why does Docker exist?" after portability pain.
-3. EVERY investigation (including mid and Capstone): Phase 0 mental model
-   (>=300 chars) using >=2 of: because, depends, layer, failure, assumption,
-   runtime, dependency, environment, signal, state. visual_system_model >=80
-   chars with boxes/arrows/layers. Technologies as
-   {{technology, engineering_pain_it_solves}} objects.
-4. Separate transferable intuition from missing artifact evidence.
-5. Track discipline: telemetry/Redfish/BMC/GPU repair/qualification = role_specific
-   only. General track stops at portability/automation/API/Docker/health/metrics.
-6. ONE cumulative system (e.g. fleet-repair-lab). Fill cumulative_system +
-   repo_growth_model. Forbidden system names: Software Portability, Python
-   Automation, Docker Project, API Project.
-7. proof_of_work_ladder: identical same_system_name on every level; each level
-   adds module_or_folder_added + new capability/proof; not separate projects.
-8. evidence_plan.github_repository = ONE repo with final_folder_structure tree
-   and evidence_files — not many repos.
-9. Capstone LAST; capstone_delta must add verification/measurement/postmortem
-   proof beyond prior integration (not a duplicate).
-10. first_investigation_prompt paste-ready; no Docker; ready_to_paste_prompt MUST
-    literally contain headings with: Phase 0, mental model, observe, build, break,
-    improve, GitHub, Obsidian.
-11. Fill guardrail_checks honestly.
+2. Docker only later as "Why does Docker exist?" after portability pain. If Docker
+   investigation exists, add Dockerfile (or docker-compose / docker docs) to the
+   SAME cumulative repo growth model and proof ladder — not a separate project.
+3. EVERY investigation (including Capstone): Phase 0 mental model (>=300 chars)
+   that literally uses at least two of these exact words: because, depends,
+   layer, failure, assumption, runtime, dependency, environment, signal, state.
+   visual_system_model >=80 chars with boxes/arrows/layers.
+4. role_signature_claims: >=4 sharp engineering truths (not generic summaries).
+5. NEVER say fully automated / no humans needed / complete automation /
+   automated everything. Use common-path automation + escalation + fail-closed.
+6. Fill operational_metrics_contract (include MTTD and MTTR or return-to-service).
+7. Fill automation_boundaries (safe / escalate / fail-closed / approval gates).
+8. Fill capstone_proof_contract with failure injections, MTTD/MTTR measurements,
+   verification + postmortem docs, hiring_manager_readout.
+9. ONE cumulative system; stable same_system_name; one github_repository with a
+   multi-line final_folder_structure tree (>=80 chars showing README/docs/src/
+   Dockerfile/tests/outputs).
+10. Capstone LAST with real proof beyond prior integration. Final
+    capstone_delta MUST literally mention: failure injection, MTTD, MTTR
+    (or return-to-service), and postmortem/verification.
+11. first_investigation_prompt paste-ready with Phase 0 / mental model / observe /
+    build / break / improve / GitHub / Obsidian; no Docker.
+12. Fill guardrail_checks honestly.
 
 === JOB DESCRIPTION ===
 {job_description.strip()}
