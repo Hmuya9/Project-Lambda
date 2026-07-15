@@ -1,4 +1,4 @@
-"""Render and write Markdown Problem-Solution Contracts."""
+"""Render and write Markdown Role-to-Roadmap outputs."""
 
 from __future__ import annotations
 
@@ -13,303 +13,209 @@ def _bullets(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items)
 
 
-def _yes_no(value: bool) -> str:
-    return "yes" if value else "no"
-
-
 def render_markdown(contract: dict[str, Any], *, job_source: str, profile_source: str) -> str:
-    role = contract["role_truth"]
-    signature = contract["role_specific_problem_signature"]
+    role = contract["role_interpretation"]
     bg = contract["candidate_background_translation"]
-    pow_ = contract["proof_of_work_project"]
-    design = pow_["design_constraints"]
-    artifacts = contract["evidence_artifacts"]
-    review = contract["staff_engineer_review"]
-    summary = contract["problem_solution_contract_summary"]
+    first = contract["first_investigation_prompt"]
+    evidence = contract["evidence_plan"]
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    rejected = "\n\n".join(
-        f"### Rejected: {item['generic_interpretation']}\n"
-        f"**Why insufficient:** {item['why_insufficient']}"
-        for item in contract["rejected_generic_interpretations"]
-    )
-
-    hidden = "\n\n".join(
+    problems = "\n\n".join(
         f"### {i}. {item['problem']}\n"
+        f"- **Why company pays for it:** {item['why_company_pays_for_it']}\n"
+        f"- **Constraints:** {', '.join(item['constraints']) if item['constraints'] else '_none_'}\n"
+        f"- **Failure modes:**\n{_bullets(item['failure_modes'])}\n"
+        f"- **JD evidence:** {item['jd_evidence']}"
+        for i, item in enumerate(contract["expensive_problem_map"], start=1)
+    )
+
+    keywords = "\n\n".join(
+        f"### `{item['surface_keyword']}` → {item['deep_skill_or_principle']}\n"
         f"- **Why it matters:** {item['why_it_matters']}\n"
-        f"- **Likely failure mode:** {item['likely_failure_mode']}\n"
-        f"- **Why not generic:** {item['why_not_generic']}\n"
-        f"- **Evidence basis:** {item['evidence_basis']}"
-        for i, item in enumerate(contract["hidden_engineering_problems"], start=1)
-    )
-
-    constraints = "\n".join(
-        f"- **{item['constraint']}** _(source: {item['source']})_"
-        for item in contract["constraints"]
-    ) or "_None listed._"
-
-    tradeoffs = "\n\n".join(
-        f"### {item['axis']}\n"
-        f"- **A:** {item['choice_a']}\n"
-        f"- **B:** {item['choice_b']}\n"
-        f"- **Recommendation:** {item['recommendation']}\n"
-        f"- **Why this axis matters here:** {item['why_this_axis_matters_here']}"
-        for item in contract["tradeoffs"]
-    )
-
-    performance = "\n".join(
-        f"- **{item['metric_or_bar']}** — {item['why_it_exists']} "
-        f"_Demonstrate by:_ {item['how_to_demonstrate']} "
-        f"_(source: {item['source']})_"
-        for item in contract["performance_expectations"]
+        f"- **Danger of learning in isolation:** {item['danger_of_learning_it_in_isolation']}"
+        for item in contract["surface_keywords_vs_deep_skills"]
     )
 
     strengths = "\n\n".join(
         f"### {item['strength']}\n"
         f"- **Profile anchor:** {item['profile_anchor']}\n"
         f"- **Role relevance:** {item['role_relevance']}"
-        for item in bg["role_relevant_strengths"]
-    )
-
-    honest_gaps = "\n".join(
-        f"- **{item['gap']}** — {item['why_it_matters_for_this_role']}"
-        for item in bg["honest_gaps"]
+        for item in bg["transferable_strengths"]
     )
 
     gaps = "\n\n".join(
         f"### Gap: {item['gap']}\n"
-        f"- **Evidence that closes it:** {item['evidence_that_would_close_it']}\n"
-        f"- **Profile relevance:** {item['profile_relevance']}"
-        for item in contract["missing_proof_of_capability"]
+        f"- **Why it blocks credibility:** {item['why_it_blocks_credibility']}\n"
+        f"- **Learn first instead:** {item['first_thing_to_learn_instead']}"
+        for item in bg["real_gaps"]
     )
 
-    checklist = "\n".join(
-        f"- [ ] **{item['check']}**\n"
-        f"  - Verify: {item['how_to_verify']}\n"
-        f"  - Pass if: {item['pass_condition']}"
-        for item in contract["verification_checklist"]
+    threshold = "\n\n".join(
+        f"### [{item['capability_scope']}] {item['capability']}\n"
+        f"- **Why it matters generally:** {item['why_it_matters_generally']}\n"
+        f"- **Connected role problem:** {item['connected_role_problem']}\n"
+        f"- **Evidence that proves it:** {item['evidence_that_proves_it']}"
+        for item in contract["general_value_threshold"]
     )
 
-    sm = pow_["state_machine"]
-    transitions = "\n".join(
-        f"- `{t['from_state']}` → `{t['to_state']}` "
-        f"({t['path_type']}) — {t['trigger']}"
-        for t in sm["transitions"]
-    ) or "_None listed._"
-
-    hw = pow_["hardware_management_simulation"]
-    ops_metrics = "\n".join(
-        f"- **{m['metric']}** — {m['definition']} "
-        f"_Measure by:_ {m['how_measured_in_project']} "
-        f"_(source: {m['source']})_"
-        for m in pow_["proposed_ops_metrics"]
+    deps = "\n\n".join(
+        f"### {i}. {item['skill_or_model']}\n"
+        f"- **Depends on:** {', '.join(item['depends_on']) if item['depends_on'] else '_none_'}\n"
+        f"- **Unlocks:** {', '.join(item['unlocks']) if item['unlocks'] else '_none_'}\n"
+        f"- **Why before later work:** {item['why_it_comes_before_later_work']}"
+        for i, item in enumerate(contract["skill_dependency_graph"], start=1)
     )
-    auto = pow_["automation_boundaries"]
-    ops = pow_["operational_model"]
 
-    return f"""# Problem-Solution Contract
+    roadmap = "\n\n".join(
+        f"### Investigation {i}: {item['title']}\n"
+        f"**Expensive problem:** {item['expensive_problem']}\n\n"
+        f"**Engineering question:** {item['engineering_question']}\n\n"
+        f"**Mental model to build:** {item['mental_model_to_build']}\n\n"
+        f"**Principles**\n{_bullets(item['principles'])}\n\n"
+        f"**Technologies introduced**\n{_bullets(item['technologies_introduced'])}\n\n"
+        f"**Observe existing system:** {item['observe_existing_system']}\n\n"
+        f"**Build or modify:** {item['build_or_modify']}\n\n"
+        f"**Break / debug / improve:** {item['break_debug_improve']}\n\n"
+        f"**Evidence output:** {item['evidence_output']}\n\n"
+        f"**Builds on prior artifact:** {item['builds_on_prior_artifact']}\n\n"
+        f"**Artifact this investigation produces:** {item['artifact_this_investigation_produces']}\n\n"
+        f"**Why this comes now:** {item['why_this_comes_now']}"
+        for i, item in enumerate(contract["investigation_roadmap"], start=1)
+    )
+
+    ladder = "\n\n".join(
+        f"### Level {item['level']}: {item['title']}\n"
+        f"- **Same system:** `{item['same_system_name']}`\n"
+        f"- **Extends previous:** {item['extends_previous_level']}\n"
+        f"- **Proves:** {item['proves']}\n"
+        f"- **Scope:** {item['scope']}\n"
+        f"- **Evidence:**\n{_bullets(item['evidence'])}\n"
+        f"- **Why not before prerequisites:** {item['why_not_before_prerequisites']}\n"
+        f"- **Connected investigations:** {', '.join(item['connected_investigations'])}"
+        for item in sorted(contract["proof_of_work_ladder"], key=lambda x: x["level"])
+    )
+
+    interviews = "\n\n".join(
+        f"### {item['expectation']}\n"
+        f"- **Current readiness:** {item['current_readiness']}\n"
+        f"- **Evidence needed:** {item['evidence_needed']}\n"
+        f"- **Likely interview challenge:** {item['likely_interview_challenge']}\n"
+        f"- **How to answer after roadmap:** {item['how_to_answer_after_roadmap']}"
+        for item in contract["interview_readiness_map"]
+    )
+
+    return f"""# Role-to-Roadmap
 
 _Generated by Project Lambda · {generated_at}_  
 _Job source:_ `{job_source}` · _Profile source:_ `{profile_source}`
 
-## 1. What this job is really about
+## 1. Role interpretation
 
 **{role['one_liner']}**
 
-{role['mission']}
+**Real mission:** {role['real_mission']}
 
 **What success looks like:** {role['what_success_looks_like']}
 
-## 2. Rejected generic interpretations
+**What this role is not**
+{_bullets(role['what_this_role_is_not'])}
 
-{rejected}
+## 2. Expensive problem map
 
-## 3. Role-specific problem signature
+{problems}
 
-{_bullets(signature['signature_statements'])}
+## 3. Surface keywords vs deep skills
 
-- **Primary failure domain:** {signature['primary_failure_domain']}
-- **Ownership boundary:** {signature['ownership_boundary']}
-- **What must become a system:** {signature['what_must_become_a_system']}
+{keywords}
 
-## 4. Surface keywords
+## 4. Candidate background translation
 
-{_bullets(contract['surface_keywords'])}
-
-## 5. Hidden engineering problems
-
-{hidden}
-
-## 6. Constraints
-
-{constraints}
-
-## 7. Tradeoffs
-
-{tradeoffs}
-
-## 8. Performance expectations
-
-{performance}
-
-## 9. Candidate background translation
-
-### Role-relevant strengths
+### Transferable strengths
 
 {strengths}
 
-### Transferable patterns
-
-{_bullets(bg['transferable_patterns'])}
-
-### Honest gaps
-
-{honest_gaps}
-
-### Must not claim
-
-{_bullets(bg['what_must_not_be_claimed'])}
-
-## 10. Missing proof of capability
+### Real gaps
 
 {gaps}
 
-## 11. Proof-of-work project
+### Misleading overclaims to avoid
 
-### {pow_['title']}
+{_bullets(bg['misleading_overclaims_to_avoid'])}
 
-**Problem statement:** {pow_['problem_statement']}
+### Strongest positioning angle
 
-**Scope:** {pow_['scope']}
+{bg['strongest_positioning_angle']}
 
-**Why this project:** {pow_['why_this_project']}
+## 5. General value threshold
 
-**Timebox:** {pow_['timebox']}
+{threshold}
 
-**Non-goals**
-{_bullets(pow_['non_goals'])}
+## 6. Skill dependency graph
 
-**Suggested stack**
-{_bullets(pow_['tech_stack_suggestion'])}
+{deps}
 
-**Deliverables**
-{_bullets(pow_['deliverables'])}
+## 7. Investigation roadmap
 
-**Success criteria**
-{_bullets(pow_['success_criteria'])}
+{roadmap}
 
-### Operational model
+## 8. Proof-of-work ladder
 
-- **Observed:** {ops['what_is_observed']}
-- **Decision:** {ops['what_decision_is_made']}
-- **Action:** {ops['what_action_is_taken']}
-- **Recovery verified by:** {ops['how_recovery_is_verified']}
-- **Escalate humans when:** {ops['when_humans_are_escalated']}
+{ladder}
 
-### Automation boundaries
+## 9. First investigation prompt
 
-- **Why not absolute full automation:** {auto['why_not_full_automation']}
+**Expensive problem:** {first['expensive_problem']}
 
-**Automated common paths**
-{_bullets(auto['automated_common_paths'])}
+**Engineering question:** {first['engineering_question']}
 
-**Human escalation paths**
-{_bullets(auto['human_escalation_paths'])}
+**Phase 0 mental model:** {first['phase_0_mental_model']}
 
-**Unsafe / ambiguous states**
-{_bullets(auto['unsafe_or_ambiguous_states'])}
+**Dependency layers**
+{_bullets(first['dependency_layers'])}
 
-**Manual approval gates**
-{_bullets(auto['manual_approval_gates'])}
+**Subquestions**
+{_bullets(first['subquestions'])}
 
-### State machine
+**Visual resources / search prompts**
+{_bullets(first['visual_resources_or_search_prompts'])}
 
-- **Required for this role:** {_yes_no(sm['required_for_this_role'])}
-- **Rationale:** {sm['rationale']}
+**Observe / build / improve / evidence plan:** {first['observe_build_improve_evidence_plan']}
 
-**States**
-{_bullets(sm['states'])}
+**Reflection question:** {first['reflection_question']}
 
-**Happy path**
-{_bullets(sm['happy_path'])}
+### Ready to paste
 
-**Transitions**
-{transitions}
+```text
+{first['ready_to_paste_prompt']}
+```
 
-**Terminal states**
-{_bullets(sm['terminal_states'])}
+## 10. Evidence plan
 
-### Hardware management simulation
+**Obsidian pages**
+{_bullets(evidence['obsidian_pages'])}
 
-- **Required by JD:** {_yes_no(hw['required_by_jd'])}
-- **JD signals:** {', '.join(hw['jd_signals']) or '_none_'}
-- **Mocked API / telemetry:** {hw['mocked_api_or_telemetry_source']}
-- **Intentionally not real:** {hw['what_is_intentionally_not_real']}
+**GitHub repos or folders**
+{_bullets(evidence['github_repos_or_folders'])}
 
-**Example endpoints / signals**
-{_bullets(hw['example_endpoints_or_signals'])}
+**Diagrams**
+{_bullets(evidence['diagrams'])}
 
-### Proposed ops metrics
+**Benchmarks or logs**
+{_bullets(evidence['benchmarks_or_logs'])}
 
-{ops_metrics}
+**README sections**
+{_bullets(evidence['readme_sections'])}
 
-### Design constraints
+**Interview artifacts**
+{_bullets(evidence['interview_artifacts'])}
 
-- **Local-first:** {_yes_no(design['local_first'])}
-- **Simulated when needed:** {_yes_no(design['simulated_when_needed'])}
-- **Includes failure injection:** {_yes_no(design['includes_failure_injection'])}
-- **Includes verification checklist:** {_yes_no(design['includes_verification_checklist'])}
-- **Required outputs:** {', '.join(design['required_outputs'])}
+## 11. Interview readiness map
 
-**Simulation strategy:** {pow_['simulation_strategy']}
-
-**Failure injection plan**
-{_bullets(pow_['failure_injection_plan'])}
-
-## 12. Evidence artifacts
-
-- **GitHub repo:** {artifacts['github_repo']}
-- **README:** {artifacts['readme']}
-- **Architecture diagram:** {artifacts['architecture_diagram']}
-- **Failure mode table:** {artifacts['failure_mode_table']}
-- **Verification log:** {artifacts['verification_log']}
-- **Benchmark / measurement output:** {artifacts['benchmark_or_measurement_output']}
-- **Postmortem / incident note:** {artifacts['postmortem_or_incident_note']}
-- **Two-minute interview explanation:** {artifacts['two_minute_interview_explanation']}
-
-## 13. Verification / benchmark checklist
-
-{checklist}
-
-## 14. Staff engineer review
-
-- **Credible?** {_yes_no(review['is_credible'])} — {review['credibility_rationale']}
-- **What makes it credible:** {review['what_makes_it_credible']}
-- **What could make it look toy:** {review['what_could_make_it_look_toy']}
-- **One hiring-manager-relevant change:** {review['one_change_for_hiring_manager_relevance']}
-- **Too broad?** {_yes_no(review['is_too_broad'])} — {review['scope_diagnosis']}
-
-**How to make it higher signal**
-{_bullets(review['how_to_make_higher_signal'])}
-
-**Hiring manager challenges**
-{_bullets(review['hiring_manager_challenges'])}
-
-## 15. Problem-Solution Contract (summary)
-
-**Problem:** {summary['problem']}
-
-**Proposed solution shape:** {summary['proposed_solution_shape']}
-
-**Non-goals**
-{_bullets(summary['non_goals'])}
-
-**Risks**
-{_bullets(summary['risks'])}
+{interviews}
 """
 
 
-def default_output_path(outputs_dir: Path, stem: str = "contract") -> Path:
+def default_output_path(outputs_dir: Path, stem: str = "roadmap") -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return outputs_dir / f"{stem}_{stamp}.md"
 

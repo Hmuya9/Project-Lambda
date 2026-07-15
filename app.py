@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Project Lambda — problem-first engineering contracts from job descriptions."""
+"""Project Lambda — Role-to-Roadmap Engine (CLI)."""
 
 from __future__ import annotations
 
@@ -23,8 +23,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="project-lambda",
         description=(
             "Translate a technical job description + engineer background "
-            "into a Problem-Solution Contract, proof-of-work spec, "
-            "and verification checklist (Markdown)."
+            "into a Role-to-Roadmap: expensive problems, mental models, "
+            "skill dependencies, investigation roadmap, proof-of-work ladder, "
+            "evidence plan, and interview readiness."
         ),
     )
     p.add_argument(
@@ -46,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--out",
         "-o",
-        help="Output Markdown path (default: outputs/contract_<timestamp>.md).",
+        help="Output Markdown path (default: outputs/roadmap_<timestamp>.md).",
     )
     p.add_argument(
         "--json",
@@ -89,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     job_source = args.job or "interactive"
     profile_source = args.profile or "interactive"
 
-    print("Generating Problem-Solution Contract...", file=sys.stderr)
+    print("Generating Role-to-Roadmap...", file=sys.stderr)
     try:
         contract = generate_contract(job, profile)
     except Exception as exc:

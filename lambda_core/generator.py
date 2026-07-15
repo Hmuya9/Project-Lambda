@@ -1,4 +1,4 @@
-"""Single-shot LLM generation of a Problem-Solution Contract."""
+"""Single-shot LLM generation of a Role-to-Roadmap."""
 
 from __future__ import annotations
 
@@ -89,7 +89,7 @@ def generate_contract(job_description: str, engineer_profile: str) -> dict[str, 
             response_format={
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "problem_solution_contract",
+                    "name": "role_to_roadmap",
                     "strict": True,
                     "schema": CONTRACT_JSON_SCHEMA,
                 },
@@ -124,21 +124,17 @@ def generate_contract(job_description: str, engineer_profile: str) -> dict[str, 
 
 
 REQUIRED_TOP_LEVEL = [
-    "role_truth",
-    "rejected_generic_interpretations",
-    "role_specific_problem_signature",
-    "surface_keywords",
-    "hidden_engineering_problems",
-    "constraints",
-    "tradeoffs",
-    "performance_expectations",
+    "role_interpretation",
+    "expensive_problem_map",
+    "surface_keywords_vs_deep_skills",
     "candidate_background_translation",
-    "missing_proof_of_capability",
-    "proof_of_work_project",
-    "evidence_artifacts",
-    "verification_checklist",
-    "staff_engineer_review",
-    "problem_solution_contract_summary",
+    "general_value_threshold",
+    "skill_dependency_graph",
+    "investigation_roadmap",
+    "proof_of_work_ladder",
+    "first_investigation_prompt",
+    "evidence_plan",
+    "interview_readiness_map",
 ]
 
 

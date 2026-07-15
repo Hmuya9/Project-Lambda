@@ -1,4 +1,4 @@
-"""Prompt templates and output schema for Problem-Solution Contract generation.
+"""Prompt templates and output schema for Role-to-Roadmap generation.
 
 Improve the product by iterating here — keep the CLI and I/O layers stable.
 """
@@ -9,288 +9,122 @@ CONTRACT_JSON_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
     "required": [
-        "role_truth",
-        "rejected_generic_interpretations",
-        "role_specific_problem_signature",
-        "surface_keywords",
-        "hidden_engineering_problems",
-        "constraints",
-        "tradeoffs",
-        "performance_expectations",
+        "role_interpretation",
+        "expensive_problem_map",
+        "surface_keywords_vs_deep_skills",
         "candidate_background_translation",
-        "missing_proof_of_capability",
-        "proof_of_work_project",
-        "evidence_artifacts",
-        "verification_checklist",
-        "staff_engineer_review",
-        "problem_solution_contract_summary",
+        "general_value_threshold",
+        "skill_dependency_graph",
+        "investigation_roadmap",
+        "proof_of_work_ladder",
+        "first_investigation_prompt",
+        "evidence_plan",
+        "interview_readiness_map",
     ],
     "properties": {
-        "role_truth": {
+        "role_interpretation": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["one_liner", "mission", "what_success_looks_like"],
+            "required": [
+                "one_liner",
+                "real_mission",
+                "what_success_looks_like",
+                "what_this_role_is_not",
+            ],
             "properties": {
                 "one_liner": {
                     "type": "string",
-                    "description": (
-                        "What this job is really about in one sharp, role-specific sentence. "
-                        "Forbidden: generic infra slogans like 'optimize latency and GPU utilization'."
-                    ),
+                    "description": "Sharp, job-specific one-liner — not a generic infra slogan.",
                 },
-                "mission": {
+                "real_mission": {
                     "type": "string",
-                    "description": (
-                        "The underlying engineering mission beneath the JD wording. "
-                        "Name the actual control problem, ownership boundary, or failure domain."
-                    ),
+                    "description": "What expensive outcomes this hire exists to own.",
                 },
                 "what_success_looks_like": {
                     "type": "string",
                     "description": (
-                        "Concrete outcomes grounded in the JD. "
-                        "Do not invent employer metrics; if proposing measurable bars, "
-                        "prefix with 'Proposed project bar:' and mark them as proposed."
+                        "Grounded in the JD. Do not invent employer metrics; "
+                        "if proposing bars, label as proposed. "
+                        "Never say 'fully automated' — prefer highly automated "
+                        "common paths with explicit human escalation for ambiguous, "
+                        "unsafe, or failed recovery states."
                     ),
                 },
-            },
-        },
-        "rejected_generic_interpretations": {
-            "type": "array",
-            "description": (
-                "Obvious/generic readings of the JD that a weak analysis would produce, "
-                "and why each is insufficient for THIS role."
-            ),
-            "minItems": 3,
-            "maxItems": 6,
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["generic_interpretation", "why_insufficient"],
-                "properties": {
-                    "generic_interpretation": {
-                        "type": "string",
-                        "description": (
-                            "A shallow reading, e.g. 'Learn Kubernetes', "
-                            "'Add observability', 'Improve GPU utilization'."
-                        ),
-                    },
-                    "why_insufficient": {
-                        "type": "string",
-                        "description": (
-                            "Why that interpretation misses the real engineering problem "
-                            "implied by THIS JD."
-                        ),
-                    },
-                },
-            },
-        },
-        "role_specific_problem_signature": {
-            "type": "object",
-            "additionalProperties": False,
-            "description": (
-                "The unique engineering signature of this job — what makes it itself, "
-                "not a generic 'AI infra' role."
-            ),
-            "required": [
-                "signature_statements",
-                "primary_failure_domain",
-                "ownership_boundary",
-                "what_must_become_a_system",
-            ],
-            "properties": {
-                "signature_statements": {
+                "what_this_role_is_not": {
                     "type": "array",
-                    "minItems": 3,
-                    "maxItems": 7,
                     "items": {"type": "string"},
-                    "description": (
-                        "Short, sharp claims unique to this role. Examples of style: "
-                        "'GPU failure is a fleet throughput problem'; "
-                        "'Repair must become a pipeline, not a manual procedure'; "
-                        "'Hardware qualification must happen before production'."
-                    ),
-                },
-                "primary_failure_domain": {
-                    "type": "string",
-                    "description": "Where value is lost when this role fails (be specific to the JD).",
-                },
-                "ownership_boundary": {
-                    "type": "string",
-                    "description": (
-                        "What this hire owns end-to-end vs what they influence. "
-                        "Prefer 'likely implied' when the JD is ambiguous."
-                    ),
-                },
-                "what_must_become_a_system": {
-                    "type": "string",
-                    "description": (
-                        "The manual, heroic, or ad-hoc work that this role must convert "
-                        "into a repeatable pipeline/system."
-                    ),
+                    "minItems": 2,
+                    "maxItems": 6,
+                    "description": "Common wrong framings of this JD to reject.",
                 },
             },
         },
-        "surface_keywords": {
+        "expensive_problem_map": {
             "type": "array",
-            "items": {"type": "string"},
+            "minItems": 3,
+            "maxItems": 8,
             "description": (
-                "Keywords/phrases taken from the JD (not invented). "
-                "These are signals only — not the analysis."
+                "Expensive engineering problems behind the role — before any project spec."
             ),
-        },
-        "hidden_engineering_problems": {
-            "type": "array",
             "items": {
                 "type": "object",
                 "additionalProperties": False,
                 "required": [
                     "problem",
+                    "why_company_pays_for_it",
+                    "constraints",
+                    "failure_modes",
+                    "jd_evidence",
+                ],
+                "properties": {
+                    "problem": {"type": "string"},
+                    "why_company_pays_for_it": {"type": "string"},
+                    "constraints": {"type": "array", "items": {"type": "string"}},
+                    "failure_modes": {"type": "array", "items": {"type": "string"}},
+                    "jd_evidence": {
+                        "type": "string",
+                        "description": (
+                            "Quote/paraphrase from JD, or 'Likely implied because …'."
+                        ),
+                    },
+                },
+            },
+        },
+        "surface_keywords_vs_deep_skills": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 12,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "surface_keyword",
+                    "deep_skill_or_principle",
                     "why_it_matters",
-                    "likely_failure_mode",
-                    "why_not_generic",
-                    "evidence_basis",
+                    "danger_of_learning_it_in_isolation",
                 ],
                 "properties": {
-                    "problem": {
-                        "type": "string",
-                        "description": (
-                            "A concrete hidden problem specific to this JD — not "
-                            "'high latency' or 'need more observability' without a mechanism."
-                        ),
-                    },
+                    "surface_keyword": {"type": "string"},
+                    "deep_skill_or_principle": {"type": "string"},
                     "why_it_matters": {"type": "string"},
-                    "likely_failure_mode": {"type": "string"},
-                    "why_not_generic": {
-                        "type": "string",
-                        "description": (
-                            "One sentence explaining why this is not interchangeable with "
-                            "generic AI-infra advice."
-                        ),
-                    },
-                    "evidence_basis": {
-                        "type": "string",
-                        "description": (
-                            "Where this came from: quote/paraphrase of JD language, or "
-                            "'Likely implied because …'. Never claim fake certainty."
-                        ),
-                    },
-                },
-            },
-            "minItems": 3,
-            "maxItems": 6,
-        },
-        "constraints": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["constraint", "source"],
-                "properties": {
-                    "constraint": {"type": "string"},
-                    "source": {
-                        "type": "string",
-                        "description": (
-                            "One of: 'stated in JD', 'likely implied', "
-                            "or 'proposed project constraint'. "
-                            "Project Lambda design defaults — local-first, "
-                            "simulated if real infrastructure unavailable, "
-                            "produce logs/metrics/tests/README, failure injection, "
-                            "verification checklist — MUST be labeled "
-                            "'proposed project constraint'. They are NOT "
-                            "'stated in JD' unless the JD explicitly requires them."
-                        ),
-                    },
-                },
-            },
-            "description": (
-                "Hard or likely constraints with explicit source labels. "
-                "Never label Project Lambda project-design defaults as "
-                "'stated in JD'."
-            ),
-        },
-        "tradeoffs": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": [
-                    "axis",
-                    "choice_a",
-                    "choice_b",
-                    "recommendation",
-                    "why_this_axis_matters_here",
-                ],
-                "properties": {
-                    "axis": {
-                        "type": "string",
-                        "description": (
-                            "A real decision axis for THIS role — not a generic "
-                            "'latency vs utilization' platitude unless the JD forces it."
-                        ),
-                    },
-                    "choice_a": {"type": "string"},
-                    "choice_b": {"type": "string"},
-                    "recommendation": {"type": "string"},
-                    "why_this_axis_matters_here": {
-                        "type": "string",
-                        "description": "Tie the tradeoff to the role's problem signature.",
-                    },
-                },
-            },
-            "minItems": 2,
-            "maxItems": 5,
-        },
-        "performance_expectations": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": [
-                    "metric_or_bar",
-                    "why_it_exists",
-                    "how_to_demonstrate",
-                    "source",
-                ],
-                "properties": {
-                    "metric_or_bar": {
-                        "type": "string",
-                        "description": (
-                            "Prefer qualitative bars from the JD. If numeric, "
-                            "only use numbers present in the JD, OR label as a "
-                            "proposed project metric."
-                        ),
-                    },
-                    "why_it_exists": {"type": "string"},
-                    "how_to_demonstrate": {"type": "string"},
-                    "source": {
-                        "type": "string",
-                        "description": (
-                            "'stated in JD' | 'likely implied' | "
-                            "'proposed project metric (not an employer requirement)'."
-                        ),
-                    },
+                    "danger_of_learning_it_in_isolation": {"type": "string"},
                 },
             },
         },
         "candidate_background_translation": {
             "type": "object",
             "additionalProperties": False,
-            "description": (
-                "Translate the engineer profile into role-relevant strengths and gaps. "
-                "Do not invent background experience not present in the profile."
-            ),
             "required": [
-                "role_relevant_strengths",
-                "transferable_patterns",
-                "honest_gaps",
-                "what_must_not_be_claimed",
+                "transferable_strengths",
+                "real_gaps",
+                "misleading_overclaims_to_avoid",
+                "strongest_positioning_angle",
             ],
             "properties": {
-                "role_relevant_strengths": {
+                "transferable_strengths": {
                     "type": "array",
                     "minItems": 2,
-                    "maxItems": 6,
+                    "maxItems": 8,
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
@@ -299,734 +133,589 @@ CONTRACT_JSON_SCHEMA: dict = {
                             "strength": {"type": "string"},
                             "profile_anchor": {
                                 "type": "string",
-                                "description": "Paraphrase of something actually in the profile.",
+                                "description": "Grounded in the profile only — never invent.",
                             },
-                            "role_relevance": {
-                                "type": "string",
-                                "description": "How this maps onto the role's problem signature.",
-                            },
+                            "role_relevance": {"type": "string"},
                         },
                     },
                 },
-                "transferable_patterns": {
+                "real_gaps": {
                     "type": "array",
-                    "items": {"type": "string"},
-                    "description": (
-                        "Engineering patterns the candidate has shown that transfer "
-                        "(e.g. admission control, backpressure) — still grounded in profile."
-                    ),
-                },
-                "honest_gaps": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 5,
+                    "minItems": 2,
+                    "maxItems": 8,
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
-                        "required": ["gap", "why_it_matters_for_this_role"],
+                        "required": ["gap", "why_it_blocks_credibility", "first_thing_to_learn_instead"],
                         "properties": {
                             "gap": {"type": "string"},
-                            "why_it_matters_for_this_role": {"type": "string"},
-                        },
-                    },
-                },
-                "what_must_not_be_claimed": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": (
-                        "Things a resume rewrite might invent here that the profile "
-                        "does not support — explicitly forbid them."
-                    ),
-                },
-            },
-        },
-        "missing_proof_of_capability": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["gap", "evidence_that_would_close_it", "profile_relevance"],
-                "properties": {
-                    "gap": {"type": "string"},
-                    "evidence_that_would_close_it": {"type": "string"},
-                    "profile_relevance": {
-                        "type": "string",
-                        "description": (
-                            "How the candidate's ACTUAL background helps or fails to "
-                            "cover this gap. Do not invent experience."
-                        ),
-                    },
-                },
-            },
-        },
-        "proof_of_work_project": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": [
-                "title",
-                "problem_statement",
-                "scope",
-                "non_goals",
-                "deliverables",
-                "tech_stack_suggestion",
-                "success_criteria",
-                "timebox",
-                "why_this_project",
-                "operational_model",
-                "automation_boundaries",
-                "state_machine",
-                "hardware_management_simulation",
-                "proposed_ops_metrics",
-                "design_constraints",
-                "simulation_strategy",
-                "failure_injection_plan",
-            ],
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Short, specific title — not 'AI Infra Optimization Platform'.",
-                },
-                "problem_statement": {
-                    "type": "string",
-                    "description": (
-                        "The single engineering problem this project proves the "
-                        "candidate can attack — tied to the role signature."
-                    ),
-                },
-                "scope": {
-                    "type": "string",
-                    "description": (
-                        "Narrow scope for 1–3 weeks. Explicitly list what is in-bounds. "
-                        "Must be buildable locally or with simulation."
-                    ),
-                },
-                "non_goals": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": (
-                        "What this project will NOT attempt (real GPU fleets, company "
-                        "systems, multi-month platforms, etc.)."
-                    ),
-                },
-                "deliverables": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 3,
-                    "maxItems": 8,
-                },
-                "tech_stack_suggestion": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Local-first tools the candidate can actually run.",
-                },
-                "success_criteria": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": (
-                        "Pass/fail criteria for the project. Prefer ops metrics "
-                        "(MTTD, time-to-triage, MTTRS, auto-resolve %, escalate %, "
-                        "false positive rate, RTS pass rate). Numbers are proposed "
-                        "project metrics, not invented employer SLOs."
-                    ),
-                },
-                "timebox": {
-                    "type": "string",
-                    "description": "Must be 1–3 weeks (e.g. '10 focused days' or '2 weeks').",
-                },
-                "why_this_project": {
-                    "type": "string",
-                    "description": (
-                        "Why this single, small project is high-signal for THIS role "
-                        "and THIS candidate profile — not generic resume padding."
-                    ),
-                },
-                "operational_model": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "description": (
-                        "Observe → decide → act → verify recovery → escalate humans. "
-                        "Required for repair/deployment/qualification/ops projects."
-                    ),
-                    "required": [
-                        "what_is_observed",
-                        "what_decision_is_made",
-                        "what_action_is_taken",
-                        "how_recovery_is_verified",
-                        "when_humans_are_escalated",
-                    ],
-                    "properties": {
-                        "what_is_observed": {"type": "string"},
-                        "what_decision_is_made": {"type": "string"},
-                        "what_action_is_taken": {"type": "string"},
-                        "how_recovery_is_verified": {"type": "string"},
-                        "when_humans_are_escalated": {"type": "string"},
-                    },
-                },
-                "automation_boundaries": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "description": (
-                        "Prefer highly automated common paths with explicit human "
-                        "escalation for ambiguous or unsafe states. Do NOT use "
-                        "absolute 'fully automated' / 'full automation' language. "
-                        "Distinguish automated common paths, human escalation, "
-                        "unsafe/ambiguous states, and manual approval gates."
-                    ),
-                    "required": [
-                        "automated_common_paths",
-                        "human_escalation_paths",
-                        "unsafe_or_ambiguous_states",
-                        "manual_approval_gates",
-                        "why_not_full_automation",
-                    ],
-                    "properties": {
-                        "automated_common_paths": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 1,
-                            "description": (
-                                "Common paths that are highly automated — not "
-                                "'fully automated forever'."
-                            ),
-                        },
-                        "human_escalation_paths": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 1,
-                        },
-                        "unsafe_or_ambiguous_states": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 1,
-                        },
-                        "manual_approval_gates": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 1,
-                        },
-                        "why_not_full_automation": {
-                            "type": "string",
-                            "description": (
-                                "Explain preferred phrasing: highly automated common "
-                                "paths with explicit human escalation for ambiguous "
-                                "or unsafe states — not absolute full automation."
-                            ),
-                        },
-                    },
-                },
-                "state_machine": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "description": (
-                        "REQUIRED when the role involves workflow, repair, deployment, "
-                        "incident response, qualification, or automation. Example "
-                        "happy path ends in a terminal success state: detected → "
-                        "triage → isolated → logs_collected → repair_action_selected → "
-                        "waiting_for_parts → return_to_service_test → production_ready. "
-                        "Use escalated as a separate terminal path. Do NOT transition "
-                        "from return_to_service / return_to_service_test back to detected."
-                    ),
-                    "required": [
-                        "required_for_this_role",
-                        "rationale",
-                        "states",
-                        "happy_path",
-                        "transitions",
-                        "terminal_states",
-                    ],
-                    "properties": {
-                        "required_for_this_role": {
-                            "type": "boolean",
-                            "description": (
-                                "True for workflow/repair/deployment/incident/"
-                                "qualification/automation roles. Almost always true "
-                                "for production-engineering / fleet / ops JDs."
-                            ),
-                        },
-                        "rationale": {
-                            "type": "string",
-                            "description": "Why a state machine is or is not required.",
-                        },
-                        "states": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": (
-                                "Explicit states. Prefer concrete names like "
-                                "detected, triage, isolated, logs_collected, "
-                                "repair_action_selected, waiting_for_parts, "
-                                "return_to_service_test, production_ready, escalated."
-                            ),
-                        },
-                        "happy_path": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": (
-                                "Ordered happy-path state sequence ending in a "
-                                "terminal success state (e.g. production_ready), "
-                                "not looping back to detected."
-                            ),
-                        },
-                        "transitions": {
-                            "type": "array",
-                            "minItems": 3,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "required": [
-                                    "from_state",
-                                    "to_state",
-                                    "trigger",
-                                    "path_type",
-                                ],
-                                "properties": {
-                                    "from_state": {"type": "string"},
-                                    "to_state": {"type": "string"},
-                                    "trigger": {"type": "string"},
-                                    "path_type": {
-                                        "type": "string",
-                                        "description": (
-                                            "One of: automated_common_path | "
-                                            "human_escalation | manual_approval | "
-                                            "unsafe_hold."
-                                        ),
-                                    },
-                                },
-                            },
-                            "description": (
-                                "Forbidden: return_to_service / return_to_service_test "
-                                "→ detected. After RTS, go to production_ready "
-                                "(terminal) or escalated (terminal). If RTS fails, "
-                                "escalate or re-enter triage/repair — do not reopen "
-                                "as a fresh 'detected' edge from RTS."
-                            ),
-                        },
-                        "terminal_states": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": (
-                                "Must include production_ready and/or treat "
-                                "return_to_service_test as terminal on pass. "
-                                "Also include escalated. Happy path must end here."
-                            ),
-                        },
-                    },
-                },
-                "hardware_management_simulation": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "description": (
-                        "If the JD mentions Redfish, BMC, IPMI, firmware telemetry, "
-                        "hardware lifecycle, or fleet health, require a mocked "
-                        "hardware management API or telemetry source."
-                    ),
-                    "required": [
-                        "required_by_jd",
-                        "jd_signals",
-                        "mocked_api_or_telemetry_source",
-                        "example_endpoints_or_signals",
-                        "what_is_intentionally_not_real",
-                    ],
-                    "properties": {
-                        "required_by_jd": {"type": "boolean"},
-                        "jd_signals": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": (
-                                "JD phrases that triggered this requirement "
-                                "(Redfish, BMC, IPMI, firmware, RMA, fleet health, etc)."
-                            ),
-                        },
-                        "mocked_api_or_telemetry_source": {
-                            "type": "string",
-                            "description": (
-                                "Describe the local mock (e.g. fake Redfish/BMC HTTP "
-                                "server, synthetic DCGM-like exporter)."
-                            ),
-                        },
-                        "example_endpoints_or_signals": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                        "what_is_intentionally_not_real": {"type": "string"},
-                    },
-                },
-                "proposed_ops_metrics": {
-                    "type": "array",
-                    "minItems": 4,
-                    "maxItems": 8,
-                    "description": (
-                        "Proposed project metrics for repair/fleet/ops work. Prefer: "
-                        "mean time to detect, mean time to triage, mean time to return "
-                        "to service, repair queue depth, percentage auto-resolved, "
-                        "percentage escalated, false positive rate, return-to-service "
-                        "pass rate. Label as proposed project metrics."
-                    ),
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": [
-                            "metric",
-                            "definition",
-                            "how_measured_in_project",
-                            "source",
-                        ],
-                        "properties": {
-                            "metric": {"type": "string"},
-                            "definition": {"type": "string"},
-                            "how_measured_in_project": {"type": "string"},
-                            "source": {
+                            "why_it_blocks_credibility": {"type": "string"},
+                            "first_thing_to_learn_instead": {
                                 "type": "string",
                                 "description": (
-                                    "Usually: 'proposed project metric "
-                                    "(not an employer requirement)'."
+                                    "Prerequisite mental model / principle — not a course list."
                                 ),
                             },
                         },
                     },
                 },
-                "design_constraints": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": [
-                        "local_first",
-                        "simulated_when_needed",
-                        "required_outputs",
-                        "includes_failure_injection",
-                        "includes_verification_checklist",
-                    ],
-                    "properties": {
-                        "local_first": {
-                            "type": "boolean",
-                            "description": "True — project runs without company systems.",
-                        },
-                        "simulated_when_needed": {
-                            "type": "boolean",
-                            "description": (
-                                "True when real GPUs / fleets / research partners "
-                                "are unavailable."
-                            ),
-                        },
-                        "required_outputs": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": (
-                                "Must include logs, metrics, tests, README, and "
-                                "tradeoff explanation."
-                            ),
-                        },
-                        "includes_failure_injection": {"type": "boolean"},
-                        "includes_verification_checklist": {"type": "boolean"},
-                    },
-                },
-                "simulation_strategy": {
-                    "type": "string",
-                    "description": (
-                        "How to simulate missing real infrastructure. If hardware "
-                        "management is required, include the mocked Redfish/BMC/IPMI "
-                        "or telemetry layer here as well."
-                    ),
-                },
-                "failure_injection_plan": {
+                "misleading_overclaims_to_avoid": {
                     "type": "array",
-                    "minItems": 2,
-                    "maxItems": 6,
                     "items": {"type": "string"},
-                    "description": "Concrete failures the project will inject and observe.",
                 },
+                "strongest_positioning_angle": {"type": "string"},
             },
         },
-        "evidence_artifacts": {
-            "type": "object",
-            "additionalProperties": False,
-            "description": "Required proof artifacts the project must produce.",
-            "required": [
-                "github_repo",
-                "readme",
-                "architecture_diagram",
-                "failure_mode_table",
-                "verification_log",
-                "benchmark_or_measurement_output",
-                "postmortem_or_incident_note",
-                "two_minute_interview_explanation",
-            ],
-            "properties": {
-                "github_repo": {
-                    "type": "string",
-                    "description": "What the repo must contain / demonstrate.",
-                },
-                "readme": {
-                    "type": "string",
-                    "description": "What the README must explain (problem, how to run, results).",
-                },
-                "architecture_diagram": {
-                    "type": "string",
-                    "description": "What the architecture diagram must show.",
-                },
-                "failure_mode_table": {
-                    "type": "string",
-                    "description": "What rows/columns the failure mode table must cover.",
-                },
-                "verification_log": {
-                    "type": "string",
-                    "description": "What a completed verification log looks like.",
-                },
-                "benchmark_or_measurement_output": {
-                    "type": "string",
-                    "description": (
-                        "What measurement artifact to produce. Numbers here are "
-                        "proposed project metrics, not invented employer SLOs."
-                    ),
-                },
-                "postmortem_or_incident_note": {
-                    "type": "string",
-                    "description": "What the incident/postmortem note must analyze.",
-                },
-                "two_minute_interview_explanation": {
-                    "type": "string",
-                    "description": (
-                        "A tight spoken script / outline the candidate could deliver "
-                        "in two minutes about the problem and evidence."
-                    ),
-                },
-            },
-        },
-        "verification_checklist": {
+        "general_value_threshold": {
             "type": "array",
+            "minItems": 6,
+            "maxItems": 14,
+            "description": (
+                "MUST include BOTH general engineering value capabilities AND "
+                "role-specific capabilities. For adjacent-background / "
+                "production-engineering (Fluidstack-like) roles, general items "
+                "MUST cover: Linux/server fluency, Python automation, reproducible "
+                "environments, config/env vars, logging/errors, basic HTTP/API, "
+                "health checks, simple metrics, state machines, incident/debug "
+                "notes, and hardware telemetry concepts — before advanced role toys."
+            ),
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["check", "how_to_verify", "pass_condition"],
+                "required": [
+                    "capability",
+                    "capability_scope",
+                    "why_it_matters_generally",
+                    "connected_role_problem",
+                    "evidence_that_proves_it",
+                ],
                 "properties": {
-                    "check": {"type": "string"},
-                    "how_to_verify": {"type": "string"},
-                    "pass_condition": {"type": "string"},
+                    "capability": {"type": "string"},
+                    "capability_scope": {
+                        "type": "string",
+                        "description": (
+                            "Exactly one of: 'general_engineering' or 'role_specific'. "
+                            "Include a majority of general_engineering items first."
+                        ),
+                    },
+                    "why_it_matters_generally": {"type": "string"},
+                    "connected_role_problem": {"type": "string"},
+                    "evidence_that_proves_it": {"type": "string"},
                 },
             },
-            "minItems": 5,
-            "maxItems": 12,
-            "description": (
-                "Project verification / benchmark checklist — runnable without "
-                "company systems."
-            ),
         },
-        "staff_engineer_review": {
+        "skill_dependency_graph": {
+            "type": "array",
+            "minItems": 7,
+            "maxItems": 14,
+            "description": (
+                "LOW-LEVEL, realistic dependency order. Example chain for fleet/repair "
+                "roles: Python script → config/env vars → logging/errors → HTTP API → "
+                "Docker/reproducible env → health checks → metrics → state machine → "
+                "mocked telemetry → final repair pipeline. FORBIDDEN: jumping from "
+                "hardware failure modes straight to Kubernetes, or Redfish before "
+                "HTTP/health/metrics foundations."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "skill_or_model",
+                    "depends_on",
+                    "unlocks",
+                    "why_it_comes_before_later_work",
+                ],
+                "properties": {
+                    "skill_or_model": {"type": "string"},
+                    "depends_on": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Prior nodes in this graph only.",
+                    },
+                    "unlocks": {"type": "array", "items": {"type": "string"}},
+                    "why_it_comes_before_later_work": {"type": "string"},
+                },
+            },
+        },
+        "investigation_roadmap": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 8,
+            "description": (
+                "FOUNDATION-FIRST learning ladder starting from the candidate's "
+                "CURRENT capability level (adjacent software/systems value), NOT from "
+                "the final role domain. Must be CUMULATIVE: each investigation produces "
+                "an artifact used by the next. Before Redfish/BMC, Kubernetes, "
+                "Prometheus/Grafana, or GPU fleet simulation, include prerequisites: "
+                "reproducible execution; Python automation with config+logs; HTTP/API "
+                "if needed; health checks + failure states; workflow/state machines; "
+                "metrics and alerts; THEN mocked hardware telemetry; THEN final repair "
+                "pipeline simulation as the LAST investigation."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "title",
+                    "expensive_problem",
+                    "engineering_question",
+                    "mental_model_to_build",
+                    "principles",
+                    "technologies_introduced",
+                    "observe_existing_system",
+                    "build_or_modify",
+                    "break_debug_improve",
+                    "evidence_output",
+                    "artifact_this_investigation_produces",
+                    "builds_on_prior_artifact",
+                    "why_this_comes_now",
+                ],
+                "properties": {
+                    "title": {"type": "string"},
+                    "expensive_problem": {"type": "string"},
+                    "engineering_question": {
+                        "type": "string",
+                        "description": "Prefer 'Why …?' form when possible.",
+                    },
+                    "mental_model_to_build": {"type": "string"},
+                    "principles": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 1,
+                    },
+                    "technologies_introduced": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Only technologies required NOW — never introduce K8s/"
+                            "Redfish/Prometheus in early investigations."
+                        ),
+                    },
+                    "observe_existing_system": {"type": "string"},
+                    "build_or_modify": {"type": "string"},
+                    "break_debug_improve": {"type": "string"},
+                    "evidence_output": {"type": "string"},
+                    "artifact_this_investigation_produces": {
+                        "type": "string",
+                        "description": (
+                            "Concrete artifact (repo folder, script, endpoint, diagram, "
+                            "log) that later investigations will extend."
+                        ),
+                    },
+                    "builds_on_prior_artifact": {
+                        "type": "string",
+                        "description": (
+                            "For investigation 1: 'none — starting artifact'. "
+                            "Otherwise name the prior artifact being extended."
+                        ),
+                    },
+                    "why_this_comes_now": {
+                        "type": "string",
+                        "description": (
+                            "Tie to candidate current level + why this unlocks the next "
+                            "step — not 'because the JD mentions it'."
+                        ),
+                    },
+                },
+            },
+        },
+        "proof_of_work_ladder": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 8,
+            "description": (
+                "ONE progressive system that grows over time — NOT disconnected "
+                "mini-projects. Each level EXTENDS the previous level of the same "
+                "repo/system. Example: L1 reproducible Python service → L2 "
+                "config/logging/errors → L3 health endpoint + failure states → "
+                "L4 repair state machine → L5 metrics/alerting → L6 mocked "
+                "Redfish/BMC telemetry → L7 final GPU repair pipeline simulation. "
+                "Final GPU repair pipeline is LAST only."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "level",
+                    "title",
+                    "proves",
+                    "scope",
+                    "extends_previous_level",
+                    "same_system_name",
+                    "evidence",
+                    "why_not_before_prerequisites",
+                    "connected_investigations",
+                ],
+                "properties": {
+                    "level": {
+                        "type": "integer",
+                        "description": "1 = base system; higher = extensions; final = role sim.",
+                    },
+                    "title": {"type": "string"},
+                    "proves": {"type": "string"},
+                    "scope": {"type": "string"},
+                    "extends_previous_level": {
+                        "type": "string",
+                        "description": (
+                            "Level 1: 'none — creates the system'. "
+                            "Else: what concrete capability is added onto the prior level."
+                        ),
+                    },
+                    "same_system_name": {
+                        "type": "string",
+                        "description": (
+                            "Stable name of the growing system/repo (same across all levels)."
+                        ),
+                    },
+                    "evidence": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 1,
+                    },
+                    "why_not_before_prerequisites": {"type": "string"},
+                    "connected_investigations": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 1,
+                    },
+                },
+            },
+        },
+        "first_investigation_prompt": {
             "type": "object",
             "additionalProperties": False,
+            "description": (
+                "Complete paste-ready Investigation 1 prompt. "
+                "EMPTY dependency_layers, subquestions, or "
+                "visual_resources_or_search_prompts is a schema FAILURE."
+            ),
             "required": [
-                "is_credible",
-                "credibility_rationale",
-                "what_makes_it_credible",
-                "what_could_make_it_look_toy",
-                "one_change_for_hiring_manager_relevance",
-                "is_too_broad",
-                "scope_diagnosis",
-                "how_to_make_higher_signal",
-                "hiring_manager_challenges",
+                "ready_to_paste_prompt",
+                "expensive_problem",
+                "engineering_question",
+                "phase_0_mental_model",
+                "dependency_layers",
+                "subquestions",
+                "visual_resources_or_search_prompts",
+                "observe_build_improve_evidence_plan",
+                "reflection_question",
             ],
             "properties": {
-                "is_credible": {
-                    "type": "boolean",
-                    "description": (
-                        "Skeptical default. Do NOT default to true. Set true only if "
-                        "the project has an explicit state machine / ops model, "
-                        "automation boundaries (highly automated common paths with "
-                        "human escalation — not absolute full automation), "
-                        "no RTS→detected loops, correct source labels for project "
-                        "constraints, meaningful simulation (mocked hardware API "
-                        "when relevant), and measurable ops metrics. Otherwise false."
-                    ),
-                },
-                "credibility_rationale": {
-                    "type": "string",
-                    "description": "Overall skeptical judgment — name remaining doubts.",
-                },
-                "what_makes_it_credible": {
-                    "type": "string",
-                    "description": "Exactly ONE concrete credibility strength.",
-                },
-                "what_could_make_it_look_toy": {
+                "ready_to_paste_prompt": {
                     "type": "string",
                     "description": (
-                        "Exactly ONE concrete way this could look like a toy demo "
-                        "to a hiring manager."
+                        "Full multi-paragraph prompt including expensive problem, "
+                        "engineering question, phase 0 mental model, dependency layers, "
+                        "subquestions, visual resources/search prompts, observe/build/"
+                        "improve/evidence plan, and reflection question."
                     ),
                 },
-                "one_change_for_hiring_manager_relevance": {
-                    "type": "string",
+                "expensive_problem": {"type": "string"},
+                "engineering_question": {"type": "string"},
+                "phase_0_mental_model": {"type": "string"},
+                "dependency_layers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                    "maxItems": 8,
+                },
+                "subquestions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                    "maxItems": 10,
+                },
+                "visual_resources_or_search_prompts": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                    "maxItems": 8,
                     "description": (
-                        "Exactly ONE change that would make the project more "
-                        "hiring-manager-relevant."
+                        "Concrete YouTube/search/diagram prompts — never empty."
                     ),
                 },
-                "is_too_broad": {
-                    "type": "boolean",
-                    "description": "True if the project smells like a 3-month platform.",
+                "observe_build_improve_evidence_plan": {"type": "string"},
+                "reflection_question": {"type": "string"},
+            },
+        },
+        "evidence_plan": {
+            "type": "object",
+            "additionalProperties": False,
+            "description": (
+                "Every section MUST be non-empty with useful concrete items. "
+                "Empty arrays are a HARD FAILURE. For Fluidstack-like "
+                "production-engineering roles, include the foundation → final "
+                "ladder evidence listed in the system rules."
+            ),
+            "required": [
+                "obsidian_pages",
+                "github_repos_or_folders",
+                "diagrams",
+                "benchmarks_or_logs",
+                "readme_sections",
+                "interview_artifacts",
+            ],
+            "properties": {
+                "obsidian_pages": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 5,
+                    "maxItems": 12,
+                    "description": (
+                        "Named Engineering Pages. Fluidstack-like example set: "
+                        "Reproducible Execution; Python Automation with Config and Logs; "
+                        "Health Checks and Failure States; Metrics and Alerts; "
+                        "Repair State Machines; Mocked Hardware Telemetry; "
+                        "GPU Repair Pipeline Simulation."
+                    ),
                 },
-                "scope_diagnosis": {
-                    "type": "string",
-                    "description": "What is correctly narrow vs what still risks sprawl.",
-                },
-                "how_to_make_higher_signal": {
+                "github_repos_or_folders": {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 2,
-                    "maxItems": 5,
+                    "maxItems": 8,
+                    "description": (
+                        "Prefer folders/modules inside the ONE growing system repo, "
+                        "not disconnected projects."
+                    ),
                 },
-                "hiring_manager_challenges": {
+                "diagrams": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "minItems": 2,
-                    "maxItems": 5,
+                    "minItems": 4,
+                    "maxItems": 10,
                     "description": (
-                        "Hard questions a hiring manager would ask to poke holes "
-                        "in the proof."
+                        "Fluidstack-like examples: dependency graph; service lifecycle "
+                        "diagram; health-check flow; repair state machine; metrics "
+                        "pipeline; mocked Redfish/BMC telemetry flow."
                     ),
+                },
+                "benchmarks_or_logs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 4,
+                    "maxItems": 10,
+                    "description": (
+                        "Fluidstack-like examples: setup log; failure injection log; "
+                        "health-check test output; MTTD/MTTR measurement output; "
+                        "alert trigger log; return-to-service verification log."
+                    ),
+                },
+                "readme_sections": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 4,
+                    "maxItems": 10,
+                },
+                "interview_artifacts": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                    "maxItems": 8,
                 },
             },
         },
-        "problem_solution_contract_summary": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["problem", "proposed_solution_shape", "non_goals", "risks"],
-            "properties": {
-                "problem": {
-                    "type": "string",
-                    "description": "Restate the role-specific problem, not a generic roadmap.",
+        "interview_readiness_map": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 10,
+            "description": (
+                "Must include role-specific expectations when present in the JD. "
+                "For Fluidstack-like roles, MUST include separate rows for: "
+                "hardware telemetry / Redfish-BMC; fleet health thinking; "
+                "incident/postmortem discipline; repair pipeline tradeoffs "
+                "(plus foundation expectations as needed)."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "expectation",
+                    "current_readiness",
+                    "evidence_needed",
+                    "likely_interview_challenge",
+                    "how_to_answer_after_roadmap",
+                ],
+                "properties": {
+                    "expectation": {
+                        "type": "string",
+                        "description": (
+                            "Concrete expectation grounded in the JD or necessary "
+                            "foundation — not vague 'know automation'."
+                        ),
+                    },
+                    "current_readiness": {
+                        "type": "string",
+                        "description": "Honest readiness grounded in the profile only.",
+                    },
+                    "evidence_needed": {"type": "string"},
+                    "likely_interview_challenge": {"type": "string"},
+                    "how_to_answer_after_roadmap": {"type": "string"},
                 },
-                "proposed_solution_shape": {
-                    "type": "string",
-                    "description": (
-                        "Shape of the proof / approach — constrained, local-first, "
-                        "failure-aware."
-                    ),
-                },
-                "non_goals": {"type": "array", "items": {"type": "string"}},
-                "risks": {"type": "array", "items": {"type": "string"}},
             },
         },
     },
 }
 
 
-SYSTEM_PROMPT = """You are Project Lambda — an engineering translation engine.
+SYSTEM_PROMPT = """You are Project Lambda — a Role-to-Roadmap Engine.
 
-CORE JOB
-Take a technical job description and an engineer background, then translate
-solution-shaped role language into hidden engineering problems, constraints,
-tradeoffs, and a sharp proof-of-work artifact.
+PRODUCT SHAPE (critical)
+You are NOT a Problem-Solution Contract Generator.
+You are NOT a project generator that jumps from a JD to job-domain toys
+(Kubernetes, Redfish, GPU repair pipelines) in Investigation 1.
 
-You are NOT a career coach, resume scorer, interview tutor, or roadmap generator.
+You ARE an engineering-growth / learning-ladder system that translates a job
+description + engineer background into expensive problems, mental models, skill
+dependencies, a progressive investigation roadmap, a CUMULATIVE proof-of-work
+ladder (one system that grows), evidence, and interview readiness.
 
-ANTI-GENERICITY (critical)
-Reject interchangeable AI-infra advice. Outputs that only say "improve latency",
-"raise GPU utilization", "add autoscaling", or "improve observability" WITHOUT a
-role-specific mechanism, ownership boundary, or failure domain are FAILURES.
+Start from the candidate's CURRENT capability level.
+For adjacent-background engineers (industrial / EE / field / partial software),
+establish general software/systems value BEFORE job-specific fleet work.
 
-Before you analyze, explicitly populate rejected_generic_interpretations with the
-obvious shallow readings and why each is insufficient for THIS JD.
-Example style:
-- "Learn Kubernetes" is insufficient if the role is about bare-metal GPU fleet
-  reliability, not writing Deployment YAML.
-- "Add dashboards" is insufficient if the real problem is absence of a repair
-  pipeline that converts hardware faults into throughput recovery.
+Always ask: what must this engineer understand first before the role project
+is credible? The final GPU repair pipeline simulation is LAST, never early.
 
-Then populate role_specific_problem_signature with what makes this job itself:
-- Rename the problem (e.g. "GPU failure is a fleet throughput problem").
-- Say what must become a system (e.g. "repair must become a pipeline").
-- Name sequencing constraints (e.g. "hardware qualification before production").
+LEARNING PIPELINE (every investigation)
+Expensive Problem → Engineering Question → Mental Model → Engineering Principles
+→ Technologies (only as needed) → Observe Existing Systems → Build or Modify
+→ Break / Debug / Improve → Explain Tradeoffs → Produce Evidence
 
-GROUNDING RULES
-1. Do not invent employer metrics (percentages, dollar amounts, SLO numbers)
-   unless they appear in the JD.
-2. If you need numbers for the proof project, label them as
-   "proposed project metric (not an employer requirement)".
-3. Prefer "likely implied because …" over fake certainty.
-4. Constraints and performance bars must carry an explicit source label.
-   Project Lambda design defaults (local-first, simulated if real
-   infrastructure unavailable, produce logs/metrics/tests/README, failure
-   injection, verification checklist) are "proposed project constraint" —
-   NEVER "stated in JD" unless the JD explicitly requires them.
-5. Never invent candidate experience. Only translate what the profile states.
-6. Quote or paraphrase JD/profile anchors when making claims.
+RULE A — FOUNDATION-FIRST
+Before Redfish/BMC, Kubernetes, Prometheus, Grafana, or GPU fleet simulation,
+the investigation_roadmap MUST include prerequisite investigations such as:
+1) Why does software need reproducible execution across machines?
+2) Python automation with config and logs
+3) HTTP/API basics if needed
+4) Health checks and failure states
+5) Workflow / state machines
+6) Metrics and alerts
+Only THEN: mocked hardware telemetry
+Only THEN: final GPU repair pipeline simulation (last investigation / last ladder level)
 
-PROOF-OF-WORK RULES
-- ONE small project. Timebox MUST be 1–3 weeks (not months).
-- Must be buildable locally or with simulation.
-- Must NOT require access to real company systems, production GPU fleets,
-  or real research teams.
-- Design constraints (all required; source = proposed project constraint):
-  - local-first
-  - simulated when real infrastructure is unavailable
-  - produces logs, metrics, tests, README, and tradeoff explanation
-  - includes failure injection
-  - includes verification checklist
-- operational_model REQUIRED: what is observed, what decision is made,
-  what action is taken, how recovery is verified, when humans escalate.
-- STATE MACHINE REQUIRED when the role involves workflow, repair, deployment,
-  incident response, qualification, or automation (true for almost all
-  production-engineering / fleet / ops JDs). Include explicit states such as:
-  detected → triage → isolated → logs_collected → repair_action_selected →
-  waiting_for_parts → return_to_service_test → production_ready.
-  Use escalated as a separate terminal path.
-  FORBIDDEN: transitions from return_to_service / return_to_service_test
-  back to detected. Happy path must end at production_ready (or treat
-  return_to_service_test as terminal on pass).
-  Tag transitions as automated_common_path | human_escalation |
-  manual_approval | unsafe_hold.
-- Avoid absolute "fully automated" language. Prefer:
-  "highly automated common paths with explicit human escalation for
-  ambiguous or unsafe states." Always distinguish automated common paths,
-  human escalation paths, unsafe/ambiguous states, and manual approval gates.
-- HARDWARE SIMULATION: if the JD mentions Redfish, BMC, IPMI, firmware
-  telemetry, hardware lifecycle, RMA, or fleet health, the project MUST
-  include a mocked hardware management API or telemetry source (fake
-  Redfish/BMC server, synthetic exporter, etc.).
-- VERIFICATION METRICS for repair/fleet/ops projects should prefer:
-  mean time to detect, mean time to triage, mean time to return to service,
-  repair queue depth, % auto-resolved, % escalated, false positive rate,
-  return-to-service pass rate. Label as proposed project metrics.
-- evidence_artifacts must specify what each required artifact contains:
-  GitHub repo, README, architecture diagram, failure mode table,
-  verification log, benchmark/measurement output, postmortem/incident note,
-  two-minute interview explanation.
+RULE B — DEPENDENCY GRAPH
+Skill dependencies must be low-level and realistic.
+Good chain example:
+Python script → config/env vars → logging/errors → HTTP API → Docker/reproducible
+env → health checks → metrics → state machine → mocked telemetry → final repair
+pipeline.
+FORBIDDEN: hardware failure modes → Kubernetes jumps; Redfish before HTTP/health;
+Prometheus before a process that emits logs/events; disconnected tech islands.
 
-STAFF REVIEW (skeptical)
-Do NOT default is_credible=true. Be a harsh reviewer.
-Must explicitly name:
-1) one thing that makes the project credible
-2) one thing that could make it look toy
-3) one change that would make it more hiring-manager-relevant
-Fail credibility if the project is vague automation theater, lacks a real
-state machine/ops model, claims absolute full/fully automated repair with
-no escalation boundaries, loops RTS back to detected, mislabels project-
-design constraints as "stated in JD", or has no meaningful
-hardware/telemetry mock when the JD demands it.
+RULE C — CUMULATIVE PROOF LADDER
+proof_of_work_ladder is ONE progressive system that grows over time — not
+disconnected mini-projects. Each level EXTENDS the previous level of the SAME
+system (same_system_name stable across levels).
+Example:
+Level 1: reproducible Python service
+Level 2: add config / logging / errors
+Level 3: add health endpoint and failure states
+Level 4: add repair state machine
+Level 5: add metrics and alerting
+Level 6: add mocked Redfish/BMC telemetry
+Level 7: final GPU repair pipeline simulation
+investigation_roadmap must also be cumulative: each produces
+artifact_this_investigation_produces that the next builds_on_prior_artifact.
+
+RULE D — FIRST INVESTIGATION PROMPT
+first_investigation_prompt MUST include non-empty:
+- expensive problem
+- engineering question
+- phase 0 mental model
+- dependency_layers (min 3)
+- subquestions (min 3)
+- visual_resources_or_search_prompts (min 3 concrete search/video/diagram prompts)
+- observe/build/improve/evidence plan
+- reflection question
+Empty lists are a HARD FAILURE. ready_to_paste_prompt must include all of the above.
+
+RULE E — GENERAL VALUE THRESHOLD
+Include BOTH capability_scope='general_engineering' AND 'role_specific'.
+For Fluidstack-like production engineering roles, general_engineering MUST cover:
+Linux/server fluency, Python automation, reproducible environments, config/env
+vars, logging/errors, basic HTTP/API understanding, health checks, simple metrics,
+state machines, incident/debug notes, hardware telemetry concepts.
+Role-specific items come after those foundations are listed.
+
+RULE F — AUTOMATION LANGUAGE
+Never use absolute "fully automated" / "full automation" wording in
+role_interpretation, success criteria, investigations, proof ladder, or interview
+answers. Prefer:
+"highly automated common repair paths with explicit human escalation for
+ambiguous, unsafe, or failed recovery states."
+
+RULE G — EVIDENCE PLAN (never empty)
+Every evidence_plan section MUST have useful non-empty items:
+obsidian_pages, github_repos_or_folders, diagrams, benchmarks_or_logs,
+readme_sections, interview_artifacts.
+For Fluidstack-like roles, Obsidian pages should include:
+Reproducible Execution; Python Automation with Config and Logs; Health Checks
+and Failure States; Metrics and Alerts; Repair State Machines; Mocked Hardware
+Telemetry; GPU Repair Pipeline Simulation.
+Diagrams should include: dependency graph; service lifecycle diagram;
+health-check flow; repair state machine; metrics pipeline; mocked Redfish/BMC
+telemetry flow.
+Benchmarks/logs should include: setup log; failure injection log; health-check
+test output; MTTD/MTTR measurement output; alert trigger log;
+return-to-service verification log.
+
+RULE H — INTERVIEW READINESS
+When the JD includes fleet/repair/telemetry themes, interview_readiness_map
+MUST include role-specific expectations for:
+- hardware telemetry / Redfish-BMC
+- fleet health thinking
+- incident/postmortem discipline
+- repair pipeline tradeoffs
+Do not only list generic "automation" / "API" soft expectations.
+
+ANTI-PATTERNS (failures)
+- Investigation 1 about hardware failure modes / K8s / Redfish / fleet repair
+- Disconnected mini-projects (new repo every level)
+- Generic study plans or course recommendations
+- Learning technologies in isolation
+- Inventing candidate experience or employer metrics
+- Empty first-investigation arrays
+- Empty evidence_plan sections
+- Absolute "fully automated" language
+- Final repair pipeline appearing before foundation layers
+- Regressing to project-first output (skipping the learning ladder)
+
+CANDIDATE TRANSLATION
+Translate the profile honestly. Transferable strengths need profile anchors.
+Real gaps: what blocks credibility + what mental model/principle comes first.
 
 OUTPUT
-Match the JSON schema exactly. Be sharp, specific, and falsifiable.
+Match the JSON schema exactly.
+Keep the foundation-first investigation roadmap as a learning ladder.
+Do not regress to project-first generation.
+Be progressive, cumulative, and grounded in the candidate's actual starting level.
 """
 
 
 def build_user_prompt(job_description: str, engineer_profile: str) -> str:
-    return f"""Translate the following role into a Problem-Solution Contract for this engineer.
+    return f"""Translate this role into a Foundation-First Role-to-Roadmap for this engineer.
 
-Priorities for THIS run:
-1. Reject generic AI-infra interpretations first.
-2. Extract the role-specific problem signature.
-3. Translate the candidate background honestly (no invented experience).
-4. Propose ONE local-first, 1–3 week proof-of-work project with:
-   - operational_model (observe → decide → act → verify → escalate)
-   - explicit state_machine ending in production_ready / escalated
-     (no return_to_service → detected loops)
-   - automation_boundaries: highly automated common paths with explicit
-     human escalation for ambiguous or unsafe states (no "fully automated")
-   - mocked hardware management API/telemetry when Redfish/BMC/IPMI/fleet health
-   - proposed ops metrics (MTTD, triage time, MTTRS, queue depth, auto-resolve %,
-     escalate %, false positive rate, RTS pass rate)
-5. Label Project Lambda design defaults as "proposed project constraint",
-   not "stated in JD".
-6. Staff review must be skeptical (do not default credible=true).
-7. Specify evidence artifacts.
+Critical priorities:
+1. Start investigations from THIS candidate's current capability level — not the
+   final JD domain. Keep the learning ladder; do NOT regress to project-first.
+2. For adjacent-background engineers, establish general software/systems value
+   before fleet/GPU/Redfish/K8s work.
+3. Make the roadmap cumulative: each investigation's artifact becomes input to
+   the next.
+4. Skill dependency graph must be low-level (Python → config → logs → HTTP →
+   Docker → health → metrics → state machine → mocked telemetry → final pipeline).
+5. Proof-of-work ladder = ONE growing system (same_system_name). Final GPU repair
+   pipeline simulation is LAST only. Prefer highly automated common repair paths
+   with explicit human escalation — NEVER "fully automated".
+6. general_value_threshold: both general_engineering and role_specific.
+7. first_investigation_prompt: NO empty lists (min 3 each for dependencies,
+   subquestions, visual prompts).
+8. evidence_plan: EVERY section non-empty with useful items (Obsidian pages,
+   diagrams, benchmarks/logs per Fluidstack-like examples in the rules).
+9. interview_readiness_map: when JD includes them, include Redfish-BMC / hardware
+   telemetry, fleet health thinking, incident/postmortem discipline, and repair
+   pipeline tradeoffs.
 
 === JOB DESCRIPTION ===
 {job_description.strip()}
@@ -1034,5 +723,5 @@ Priorities for THIS run:
 === ENGINEER PROFILE / BACKGROUND ===
 {engineer_profile.strip()}
 
-Produce the structured contract now. Be role-specific and engineering-concrete.
+Produce the structured Role-to-Roadmap JSON now.
 """
