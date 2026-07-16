@@ -129,8 +129,9 @@ def render_markdown(contract: dict[str, Any], *, job_source: str, profile_source
 
     cumulative = contract["cumulative_system"]
     growth = "\n".join(
-        f"{g['investigation_number']}. Investigation {g['investigation_number']} adds "
-        f"`{g['folder_or_module_added']}` — {g['capability_added']} "
+        f"{g['investigation_number']}. Investigation {g['investigation_number']}"
+        f"{(' — ' + g['investigation_title']) if g.get('investigation_title') else ''} "
+        f"adds `{g['folder_or_module_added']}` — {g['capability_added']} "
         f"({g['why_it_matters']}). Evidence: {g['evidence_created']}"
         for g in sorted(
             cumulative.get("repo_growth_model") or [],
@@ -172,6 +173,7 @@ def render_markdown(contract: dict[str, Any], *, job_source: str, profile_source
 
     metrics = "\n\n".join(
         f"### {item['metric']}\n"
+        f"- **Source:** `{item.get('source', 'unspecified')}`\n"
         f"- **Why it matters:** {item['why_it_matters']}\n"
         f"- **How to measure in the project:** {item['how_to_measure_in_the_project']}\n"
         f"- **What a bad result means:** {item['what_bad_result_means']}"

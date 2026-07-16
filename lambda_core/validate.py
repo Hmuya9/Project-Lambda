@@ -157,9 +157,15 @@ GENERAL_TRACK_FORBIDDEN = (
 CAPSTONE_EARLY_TERMS = (
     "capstone",
     "final pipeline",
+    "end-to-end gpu repair",
+)
+
+# Role-specific pipeline sims may appear before the final capstone verification.
+# Only reject these when they appear in the first few investigations.
+PIPELINE_SIM_EARLY_ONLY = (
     "gpu repair pipeline simulation",
     "full repair pipeline",
-    "end-to-end gpu repair",
+    "repair pipeline simulation",
 )
 
 CAPSTONE_DELTA_TERMS = (
@@ -225,6 +231,112 @@ DOCKER_ARTIFACT_TERMS = (
     "containerization_tradeoffs",
 )
 
+ALLOWED_METRIC_SOURCES = (
+    "stated_in_jd",
+    "implied_by_jd",
+    "proposed_project_target",
+)
+
+# Legacy / prose source labels that mean "stated in JD"
+STATED_IN_JD_ALIASES = (
+    "stated_in_jd",
+    "stated in jd",
+    "stated in the jd",
+    "stated in job description",
+    "from the jd",
+    "explicit in jd",
+)
+
+PROPOSED_TARGET_ALIASES = (
+    "proposed_project_target",
+    "proposed project target",
+    "proposed project bar",
+    "proposed project bar (not an employer requirement)",
+    "project target",
+    "project bar",
+)
+
+IMPLIED_ALIASES = (
+    "implied_by_jd",
+    "implied by jd",
+    "likely implied",
+    "implied",
+)
+
+HARDWARE_TOOLING_TERMS = (
+    "redfish",
+    "bmc",
+    "ipmi",
+)
+
+VAGUE_INV1_BUILD_PHRASES = (
+    "create a simple application",
+    "build a simple application",
+    "create a basic application",
+    "build a basic app",
+    "create a simple app",
+    "build a simple project",
+    "create a simple project",
+    "make a simple application",
+    "write a simple application",
+)
+
+MACHINE_REPORT_TERMS = (
+    "machine-report",
+    "machine_report",
+    "machinereport",
+)
+
+MACHINE_REPORT_CONCRETE_BITS = (
+    "python version",
+    "app_env",
+    "environment variable",
+    "env var",
+    "output/report.txt",
+    "report.txt",
+)
+
+FAKE_ACHIEVEMENT_PHRASES = (
+    "i successfully validated",
+    "successfully validated",
+    "mttd was consistently under",
+    "mttr was maintained below",
+    "mttr was consistently under",
+    "mttd was under",
+    "mttr was under",
+    "i built",
+    "i proved",
+    "i achieved",
+    "i demonstrated that",
+    "was consistently under",
+    "was maintained below",
+)
+
+FUTURE_FRAMING_PHRASES = (
+    "after completing",
+    "should be able to say",
+    "candidate should",
+    "target measurement",
+    "target:",
+    "evidence to produce",
+    "final readout should",
+    "will be able to",
+    "once complete",
+    "upon completion",
+    "template",
+    "future script",
+    "planned readout",
+)
+
+# JD must treat containers as a primary role-specific duty to allow Docker on role_specific
+CONTAINER_PRIMARY_DUTY_PATTERNS = (
+    r"own\s+.*\b(docker|container)\b",
+    r"\bcontainer infrastructure\b",
+    r"\bcontainer platform\b",
+    r"primary.*\b(docker|containerization)\b",
+    r"\bdocker\b.*\b(primary|own|responsible)\b",
+)
+
 
 class ValidationError(Exception):
     """Raised when a roadmap violates Project Lambda semantic rules."""
@@ -232,6 +344,167 @@ class ValidationError(Exception):
 
 def _lower(text: str | None) -> str:
     return (text or "").lower()
+
+
+def _norm_path(path: str) -> str:
+    """Normalize module/folder paths for comparison."""
+    p = _lower(path).strip().replace("\\", "/")
+    p = re.sub(r"/+", "/", p)
+    return p.rstrip("/")
+
+
+def _modules_align(a: str, b: str) -> bool:
+    """True if two module/folder paths refer to the same addition."""
+    na, nb = _norm_path(a), _norm_path(b)
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    # Identical leaf file/folder name (not bare top-level dirs)
+    a_parts = [p for p in na.split("/") if p]
+    b_parts = [p for p in nb.split("/") if p]
+    if not a_parts or not b_parts:
+        return False
+    if a_parts[-1] == b_parts[-1] and a_parts[-1] not in {
+        "src",
+        "docs",
+        "tests",
+        "outputs",
+    }:
+        return True
+    return False
+
+
+def _is_vague_module(path: str) -> bool:
+    p = _norm_path(path)
+    return p in {"", "src", "docs", "tests", "outputs", "lib", "app"}
+
+
+def _norm_title(title: str) -> str:
+    t = _lower(title)
+    t = re.sub(r"[^a-z0-9\s/+-]", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _titles_align(a: str, b: str) -> bool:
+    """True if titles refer to the same investigation topic."""
+    na, nb = _norm_title(a), _norm_title(b)
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    if na in nb or nb in na:
+        return True
+    # Significant token overlap (ignore short stopwords); allow simple stems
+    stop = {
+        "how", "why", "does", "do", "a", "an", "the", "and", "or", "to", "of",
+        "in", "for", "with", "what", "when", "still", "need", "needs", "between",
+    }
+
+    def tokens(text: str) -> set[str]:
+        out: set[str] = set()
+        for w in text.split():
+            if len(w) <= 2 or w in stop:
+                continue
+            out.add(w)
+            if w.endswith("s") and len(w) > 4:
+                out.add(w[:-1])
+            if w.endswith("ing") and len(w) > 5:
+                out.add(w[:-3])
+        return out
+
+    ta, tb = tokens(na), tokens(nb)
+    if not ta or not tb:
+        return False
+    overlap = ta & tb
+    return len(overlap) >= min(2, min(len(ta), len(tb)))
+
+
+def _track_entry_matches_investigation(entry: str, inv: dict[str, Any]) -> bool:
+    """Whether a roadmap_tracks entry corresponds to an investigation."""
+    title = str(inv.get("title") or "")
+    blob = _norm_title(
+        " ".join(
+            [
+                title,
+                str(inv.get("engineering_question") or ""),
+                str(inv.get("expensive_problem") or ""),
+                str(inv.get("module_or_folder_added") or ""),
+            ]
+        )
+    )
+    entry_n = _norm_title(entry)
+    if not entry_n or not blob:
+        return False
+    if entry_n in blob or blob in entry_n:
+        return True
+    if _titles_align(entry, title):
+        return True
+    stop = {"how", "why", "does", "do", "the", "and", "for", "with", "what"}
+    entry_tokens = [tok for tok in entry_n.split() if len(tok) > 3 and tok not in stop]
+    if not entry_tokens:
+        entry_tokens = [tok for tok in entry_n.split() if len(tok) > 2]
+    hits = sum(1 for tok in entry_tokens if tok in blob)
+    # Match if half+ of meaningful entry tokens appear in the investigation blob
+    return hits >= max(1, (len(entry_tokens) + 1) // 2)
+
+
+def _normalize_metric_source(source: str) -> str | None:
+    """Map freeform source labels to canonical enum, or None if unknown."""
+    s = _lower(source).strip()
+    if not s:
+        return None
+    if s in STATED_IN_JD_ALIASES or s.startswith("stated"):
+        return "stated_in_jd"
+    if s in IMPLIED_ALIASES or "implied" in s:
+        return "implied_by_jd"
+    if s in PROPOSED_TARGET_ALIASES or "proposed" in s or "project target" in s or "project bar" in s:
+        return "proposed_project_target"
+    return None
+
+
+def _extract_numeric_thresholds(text: str) -> list[str]:
+    """Pull numeric threshold tokens (numbers, percentages, time units) from text."""
+    found: list[str] = []
+    # e.g. 5 minutes, 30 min, <5, under 5, 99%, 6-month
+    for m in re.finditer(
+        r"\b\d+(?:\.\d+)?\s*(?:minutes?|mins?|seconds?|secs?|hours?|hrs?|ms|%|percent)?\b",
+        text,
+        flags=re.I,
+    ):
+        found.append(m.group(0).strip().lower())
+    for m in re.finditer(r"(?:under|below|less than|<|>|<=)\s*\d+(?:\.\d+)?", text, flags=re.I):
+        found.append(m.group(0).strip().lower())
+    return found
+
+
+def _number_token_in_jd(token: str, jd: str) -> bool:
+    """Check whether the numeric core of a threshold appears in the JD."""
+    jd_l = _lower(jd)
+    nums = re.findall(r"\d+(?:\.\d+)?", token)
+    if not nums:
+        return True
+    for num in nums:
+        # Require the number as a whole token somewhere in JD
+        if not re.search(rf"(?<!\d){re.escape(num)}(?!\d)", jd_l):
+            return False
+    return True
+
+
+def _jd_has_container_primary_duty(jd: str) -> bool:
+    jd_l = _lower(jd)
+    return any(re.search(p, jd_l) for p in CONTAINER_PRIMARY_DUTY_PATTERNS)
+
+
+def _has_future_framing(text: str) -> bool:
+    low = _lower(text)
+    return any(p in low for p in FUTURE_FRAMING_PHRASES)
+
+
+def _fake_achievement_hits(text: str) -> list[str]:
+    low = _lower(text)
+    return [p for p in FAKE_ACHIEVEMENT_PHRASES if p in low]
 
 
 def _join_fields(item: dict[str, Any], fields: tuple[str, ...]) -> str:
@@ -339,9 +612,17 @@ def _portability_without_docker(inv: dict[str, Any]) -> bool:
     return bool(_contains_any(blob, PORTABILITY_TERMS))
 
 
-def validate_roadmap(data: dict[str, Any]) -> None:
-    """Validate a generated roadmap. Raises ValidationError with all failures."""
+def validate_roadmap(
+    data: dict[str, Any],
+    job_description: str | None = None,
+) -> None:
+    """Validate a generated roadmap. Raises ValidationError with all failures.
+
+    When job_description is provided, also enforce JD-anchored rules (metric
+    sourcing, Redfish/BMC coverage, Docker role-specific exceptions).
+    """
     failures: list[str] = []
+    jd_text = job_description or ""
 
     investigations = data.get("investigation_roadmap") or []
     if not isinstance(investigations, list) or not investigations:
@@ -474,23 +755,22 @@ def validate_roadmap(data: dict[str, Any]) -> None:
     late_start = max(0, int(n * 0.8))  # last 20%
     for i, inv in enumerate(investigations):
         blob = _lower(_join_fields(inv, ("title", "engineering_question", "expensive_problem")))
-        hits = _contains_any(blob, CAPSTONE_EARLY_TERMS)
-        if not hits:
-            # also catch "gpu repair pipeline" loosely in early slots
-            if i < early_cutoff and (
-                "gpu repair pipeline" in blob or "repair pipeline simulation" in blob
-            ):
-                hits = ["gpu repair pipeline simulation"]
-        if hits and i < early_cutoff:
+        capstone_hits = _contains_any(blob, CAPSTONE_EARLY_TERMS)
+        pipeline_hits = _contains_any(blob, PIPELINE_SIM_EARLY_ONLY)
+        if capstone_hits and i < early_cutoff:
             failures.append(
                 f"Capstone/final pipeline terms appear too early in Investigation {i + 1} "
-                f"({inv.get('title', '')}): {', '.join(sorted(set(hits)))}."
+                f"({inv.get('title', '')}): {', '.join(sorted(set(capstone_hits)))}."
             )
-        if hits and i < late_start and i >= early_cutoff:
-            # Capstone-like investigation should live in the final 20%
+        if capstone_hits and i < late_start and i >= early_cutoff:
             failures.append(
                 f"Capstone/final simulation '{inv.get('title', '')}' appears before the "
                 f"last 20% of investigations (index {i + 1}/{n})."
+            )
+        if pipeline_hits and i < early_cutoff:
+            failures.append(
+                f"Repair pipeline simulation appears too early in Investigation {i + 1} "
+                f"({inv.get('title', '')}): {', '.join(sorted(set(pipeline_hits)))}."
             )
 
     # 8. Background must not be treated as software evidence
@@ -600,6 +880,45 @@ def validate_roadmap(data: dict[str, Any]) -> None:
                     "first_investigation_prompt.ready_to_paste_prompt includes Docker "
                     "(forbidden for Investigation 1)."
                 )
+            # Concrete machine-report project required (not vague build language)
+            vague_hits = [p for p in VAGUE_INV1_BUILD_PHRASES if p in ready_l]
+            has_machine_report = any(t in ready_l for t in MACHINE_REPORT_TERMS)
+            concrete_bits = _contains_any(ready_l, MACHINE_REPORT_CONCRETE_BITS)
+            build_blob = _lower(
+                str(first_prompt.get("build_or_modify") or "")
+                + " "
+                + str(inv1.get("build_or_modify") or "")
+                + " "
+                + ready
+            )
+            if vague_hits and not has_machine_report:
+                failures.append(
+                    "Investigation 1 uses vague build language without a concrete "
+                    f"machine-report project: {', '.join(vague_hits)}."
+                )
+            if not has_machine_report and not any(
+                t in _lower(build_blob) for t in MACHINE_REPORT_TERMS
+            ):
+                # Also accept concrete bits without exact name if enough specifics present
+                if len(concrete_bits) < 3 and len(
+                    _contains_any(build_blob, MACHINE_REPORT_CONCRETE_BITS)
+                ) < 3:
+                    failures.append(
+                        "Investigation 1 / first_investigation_prompt must specify a "
+                        "concrete machine-report-style project (name machine-report / "
+                        "machine_report, or include Python version check + required env "
+                        "var + output/report.txt)."
+                    )
+            elif has_machine_report or any(
+                t in _lower(build_blob) for t in MACHINE_REPORT_TERMS
+            ):
+                bits = _contains_any(build_blob, MACHINE_REPORT_CONCRETE_BITS)
+                if len(bits) < 2:
+                    failures.append(
+                        "machine-report Investigation 1 is missing concrete requirements "
+                        "(need at least two of: Python version check, APP_ENV / env var, "
+                        "output/report.txt)."
+                    )
 
     # 11. Cumulative system exists and is role-shaped
     cumulative = data.get("cumulative_system")
@@ -966,6 +1285,328 @@ def validate_roadmap(data: dict[str, Any]) -> None:
                     "role_signature_claims look like generic job-summary language; "
                     "need sharp engineering truths."
                 )
+
+    # 21. Roadmap consistency: growth / ladder / investigations agree
+    growth_list: list[dict[str, Any]] = []
+    if isinstance(cumulative, dict):
+        raw_growth = cumulative.get("repo_growth_model") or []
+        if isinstance(raw_growth, list):
+            growth_list = [g for g in raw_growth if isinstance(g, dict)]
+
+    inv_modules = [
+        _norm_path(str(inv.get("module_or_folder_added") or ""))
+        for inv in investigations
+        if isinstance(inv, dict)
+    ]
+    inv_titles = [
+        str(inv.get("title") or "") for inv in investigations if isinstance(inv, dict)
+    ]
+
+    if growth_list and len(growth_list) != n:
+        failures.append(
+            f"repo_growth_model count ({len(growth_list)}) must match "
+            f"investigation_roadmap count ({n})."
+        )
+    else:
+        # Sort by investigation_number when present
+        sorted_growth = sorted(
+            growth_list,
+            key=lambda g: int(g.get("investigation_number") or 0),
+        )
+        for i, inv in enumerate(investigations):
+            if not isinstance(inv, dict):
+                continue
+            if i >= len(sorted_growth):
+                break
+            g = sorted_growth[i]
+            g_num = int(g.get("investigation_number") or 0)
+            expected_num = i + 1
+            if g_num and g_num != expected_num:
+                failures.append(
+                    f"repo_growth_model investigation_number {g_num} does not align "
+                    f"with investigation index {expected_num}."
+                )
+            g_title = str(g.get("investigation_title") or "").strip()
+            inv_title = str(inv.get("title") or "")
+            if g_title and inv_title and not _titles_align(g_title, inv_title):
+                failures.append(
+                    f"Investigation {expected_num} title mismatch: roadmap says "
+                    f"'{inv_title}' but repo_growth_model says '{g_title}'."
+                )
+            g_mod = str(g.get("folder_or_module_added") or "")
+            inv_mod = str(inv.get("module_or_folder_added") or "")
+            if _is_vague_module(inv_mod):
+                failures.append(
+                    f"Investigation {expected_num} module_or_folder_added is too vague "
+                    f"('{inv_mod}'). Use the same specific path as repo_growth_model "
+                    "(e.g. src/machine_report.py, not just src/)."
+                )
+            elif g_mod and inv_mod and not _modules_align(g_mod, inv_mod):
+                failures.append(
+                    f"Investigation {expected_num} module mismatch: roadmap module "
+                    f"'{inv.get('module_or_folder_added')}' vs repo growth "
+                    f"'{g.get('folder_or_module_added')}'."
+                )
+            elif inv_mod and not g_mod:
+                failures.append(
+                    f"Investigation {expected_num} has module "
+                    f"'{inv.get('module_or_folder_added')}' but repo_growth_model "
+                    "entry is missing folder_or_module_added."
+                )
+
+    if isinstance(ladder, list) and ladder:
+        ladder_items = [lv for lv in ladder if isinstance(lv, dict)]
+        if len(ladder_items) != n:
+            failures.append(
+                f"proof_of_work_ladder count ({len(ladder_items)}) must match "
+                f"investigation_roadmap count ({n})."
+            )
+        else:
+            sorted_ladder = sorted(
+                ladder_items,
+                key=lambda lv: int(lv.get("level") or 0),
+            )
+            for i, inv in enumerate(investigations):
+                if not isinstance(inv, dict) or i >= len(sorted_ladder):
+                    continue
+                lv = sorted_ladder[i]
+                level = int(lv.get("level") or 0)
+                if level and level != i + 1:
+                    failures.append(
+                        f"proof_of_work_ladder level {level} does not align with "
+                        f"investigation index {i + 1}."
+                    )
+                lv_mod = str(lv.get("module_or_folder_added") or "")
+                inv_mod = str(inv.get("module_or_folder_added") or "")
+                if lv_mod and inv_mod and not _is_vague_module(inv_mod) and not _modules_align(
+                    lv_mod, inv_mod
+                ):
+                    failures.append(
+                        f"Investigation {i + 1} module mismatch vs proof ladder: "
+                        f"roadmap '{inv.get('module_or_folder_added')}' vs ladder "
+                        f"'{lv.get('module_or_folder_added')}'."
+                    )
+                # Growth and ladder must agree even when investigation is vague
+                if i < len(sorted_growth):
+                    g_mod = str(sorted_growth[i].get("folder_or_module_added") or "")
+                    if g_mod and lv_mod and not _modules_align(g_mod, lv_mod):
+                        failures.append(
+                            f"Investigation {i + 1}: repo_growth_model module "
+                            f"'{g_mod}' does not match proof_of_work_ladder module "
+                            f"'{lv_mod}'."
+                        )
+
+    # Growth folders must appear in roadmap or ladder modules
+    roadmap_ladder_modules = set(m for m in inv_modules if m)
+    for lv in ladder if isinstance(ladder, list) else []:
+        if isinstance(lv, dict):
+            m = _norm_path(str(lv.get("module_or_folder_added") or ""))
+            if m:
+                roadmap_ladder_modules.add(m)
+    for g in growth_list:
+        g_mod = _norm_path(str(g.get("folder_or_module_added") or ""))
+        if g_mod and g_mod not in roadmap_ladder_modules:
+            # Allow if any roadmap/ladder module contains the growth path or vice versa
+            if not any(
+                g_mod in m or m in g_mod for m in roadmap_ladder_modules
+            ):
+                failures.append(
+                    f"repo_growth_model folder '{g.get('folder_or_module_added')}' "
+                    "does not appear in investigation_roadmap or proof_of_work_ladder "
+                    "modules."
+                )
+
+    # final_folder_structure should mention growth modules (loose path fragments)
+    if isinstance(github, dict) and growth_list:
+        tree_l = _lower(str(github.get("final_folder_structure") or ""))
+        if tree_l:
+            missing_in_tree: list[str] = []
+            for g in growth_list:
+                raw = str(g.get("folder_or_module_added") or "").strip()
+                if not raw:
+                    continue
+                # Check leaf name appears in tree
+                leaf = raw.replace("\\", "/").rstrip("/").split("/")[-1]
+                parent_hint = raw.replace("\\", "/").split("/")[0] if "/" in raw.replace("\\", "/") else ""
+                if leaf and leaf.lower() not in tree_l:
+                    # Dockerfile at root is a common miss if tree omits it
+                    if parent_hint and parent_hint.lower() in tree_l and len(leaf) > 20:
+                        continue
+                    missing_in_tree.append(raw)
+            # Only flag when many growth modules are absent (avoid brittle single misses)
+            if len(missing_in_tree) >= max(2, len(growth_list) // 2):
+                failures.append(
+                    "evidence_plan.final_folder_structure is missing many modules from "
+                    f"repo_growth_model (e.g. {', '.join(missing_in_tree[:4])})."
+                )
+
+    # 22. Track label discipline vs roadmap_tracks lists
+    general_invs = [
+        inv for inv in investigations
+        if isinstance(inv, dict) and str(inv.get("track", "")).lower() == "general"
+    ]
+    role_invs = [
+        inv for inv in investigations
+        if isinstance(inv, dict) and str(inv.get("track", "")).lower() == "role_specific"
+    ]
+    for inv in general_invs:
+        if not any(_track_entry_matches_investigation(str(e), inv) for e in general_track):
+            failures.append(
+                f"Investigation '{inv.get('title', '')}' is labeled general but does "
+                "not appear in roadmap_tracks.general_engineering_track."
+            )
+    for inv in role_invs:
+        if not any(_track_entry_matches_investigation(str(e), inv) for e in role_track):
+            failures.append(
+                f"Investigation '{inv.get('title', '')}' is labeled role_specific but "
+                "does not appear in roadmap_tracks.role_specific_track."
+            )
+
+    # Docker cannot be role-specific unless JD treats containers as primary duty
+    docker_role_specific = False
+    for inv in role_invs:
+        blob = _lower(
+            _join_fields(
+                inv,
+                ("title", "engineering_question", "expensive_problem", "build_or_modify"),
+            )
+        )
+        if "docker" in blob:
+            docker_role_specific = True
+    for entry in role_track:
+        if "docker" in _lower(str(entry)):
+            docker_role_specific = True
+    if docker_role_specific:
+        if not jd_text or not _jd_has_container_primary_duty(jd_text):
+            failures.append(
+                "Docker appears on the role_specific track, but the JD does not treat "
+                "container infrastructure as a primary role-specific duty. Move Docker "
+                "to general_engineering_track."
+            )
+
+    # 23. Metric / performance source honesty
+    def _check_sourced_item(label: str, text: str, source_raw: str) -> None:
+        canonical = _normalize_metric_source(source_raw)
+        if source_raw and canonical is None:
+            failures.append(
+                f"{label} has unrecognized source '{source_raw}' "
+                f"(use stated_in_jd | implied_by_jd | proposed_project_target)."
+            )
+            return
+        if not canonical:
+            failures.append(
+                f"{label} is missing source "
+                "(stated_in_jd | implied_by_jd | proposed_project_target)."
+            )
+            return
+        # Reject prose "stated in JD" style when we can detect it was meant as stated
+        thresholds = _extract_numeric_thresholds(text)
+        if canonical == "stated_in_jd" and thresholds and jd_text:
+            for tok in thresholds:
+                if not _number_token_in_jd(tok, jd_text):
+                    failures.append(
+                        f"{label} marks numeric threshold '{tok}' as stated_in_jd, "
+                        "but that number does not appear in the job description. "
+                        "Use proposed_project_target."
+                    )
+                    break
+        elif canonical == "stated_in_jd" and thresholds and not jd_text:
+            # Without JD text, still reject invented ops SLOs commonly fabricated
+            invented = any(
+                x in _lower(text)
+                for x in (
+                    "under 5 minute",
+                    "under 5 min",
+                    "under 30 minute",
+                    "under 30 min",
+                    "<5 min",
+                    "<30 min",
+                    "5 minutes",
+                    "30 minutes",
+                )
+            )
+            if invented and ("mttd" in _lower(text) or "mttr" in _lower(text)):
+                failures.append(
+                    f"{label} looks like a fabricated MTTD/MTTR threshold marked "
+                    "stated_in_jd; use proposed_project_target unless the JD states "
+                    "the exact number."
+                )
+
+    for i, item in enumerate(metrics if isinstance(metrics, list) else [], start=1):
+        if not isinstance(item, dict):
+            continue
+        metric_text = " ".join(
+            [
+                str(item.get("metric") or ""),
+                str(item.get("how_to_measure_in_the_project") or ""),
+                str(item.get("why_it_matters") or ""),
+            ]
+        )
+        source_raw = str(item.get("source") or "")
+        _check_sourced_item(f"operational_metrics_contract[{i}] ({item.get('metric', '?')})", metric_text, source_raw)
+
+    for i, item in enumerate(data.get("performance_requirements") or [], start=1):
+        if not isinstance(item, dict):
+            continue
+        req_text = str(item.get("requirement") or "")
+        source_raw = str(item.get("source") or "")
+        _check_sourced_item(f"performance_requirements[{i}]", req_text, source_raw)
+
+    # 24. JD hardware tooling must appear explicitly in role-specific roadmap
+    if jd_text:
+        jd_tooling = _contains_any(jd_text, HARDWARE_TOOLING_TERMS)
+        if jd_tooling:
+            role_blob_parts: list[str] = []
+            for inv in role_invs:
+                role_blob_parts.append(
+                    _join_fields(
+                        inv,
+                        (
+                            "title",
+                            "engineering_question",
+                            "expensive_problem",
+                            "phase_0_mental_model",
+                            "subquestions",
+                            "concepts_and_vocabulary",
+                            "build_or_modify",
+                        ),
+                    )
+                )
+            for entry in role_track:
+                role_blob_parts.append(str(entry))
+            role_blob = _lower(" ".join(role_blob_parts))
+            missing_tools = [t for t in jd_tooling if t not in role_blob]
+            # If JD has redfish/bmc/ipmi, at least one must appear explicitly
+            if missing_tools == list(jd_tooling):
+                failures.append(
+                    "JD mentions "
+                    + ", ".join(sorted(set(jd_tooling)))
+                    + " but the role-specific roadmap never names those concepts "
+                    "explicitly (do not collapse into only generic 'hardware telemetry')."
+                )
+
+    # 25. Capstone must not use fake past-tense achievement language
+    if isinstance(proof, dict):
+        readout = str(proof.get("hiring_manager_readout") or "")
+        demo = " ".join(str(x) for x in (proof.get("what_it_must_demonstrate") or []))
+        measurements = " ".join(str(x) for x in (proof.get("required_measurements") or []))
+        capstone_blob = " ".join([readout, demo, measurements])
+        fake_hits = _fake_achievement_hits(capstone_blob)
+        if fake_hits and not _has_future_framing(capstone_blob):
+            failures.append(
+                "capstone_proof_contract uses fake past-tense achievement language "
+                f"({', '.join(sorted(set(fake_hits)))}) without future-target framing. "
+                "Use 'After completing…', 'Target measurement…', or "
+                "'Evidence to produce…'."
+            )
+        # Stronger: readout specifically
+        readout_fakes = _fake_achievement_hits(readout)
+        if readout_fakes and not _has_future_framing(readout):
+            failures.append(
+                "capstone_proof_contract.hiring_manager_readout claims completed "
+                f"results ({', '.join(sorted(set(readout_fakes)))}). Project Lambda "
+                "generates a roadmap, not fake achievements."
+            )
 
     if failures:
         bullet = "\n".join(f"- {f}" for f in failures)

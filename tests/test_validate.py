@@ -23,6 +23,7 @@ def _latest_roadmap_json() -> Path | None:
 FLUIDSTACK_ROADMAP = _latest_roadmap_json() or (
     ROOT / "outputs" / "roadmap_20260715_175853.json"
 )
+FLUIDSTACK_JD = ROOT / "examples" / "jobs" / "fluidstack_production_engineering.md"
 
 
 def _minimal_good_roadmap() -> dict:
@@ -50,10 +51,15 @@ def _minimal_good_roadmap() -> dict:
         "engineering_principles": ["make assumptions explicit", "document setup"],
         "technologies_involved": [],
         "observe_first": "Watch a setup fail on a clean machine.",
-        "build_or_modify": "Create a tiny script with README setup steps.",
+        "build_or_modify": (
+            "Build project machine-report: check Python version, require APP_ENV, "
+            "use one external dependency, write output/report.txt, log steps, "
+            "fail clearly when config is missing, include README + failure log + "
+            "assumptions table."
+        ),
         "intentionally_break_debug": "Change Python version and missing dependency.",
         "improve": "Add clearer setup instructions.",
-        "github_evidence": "Repo with script + README + setup notes.",
+        "github_evidence": "Repo with machine-report script + README + setup notes.",
         "obsidian_engineering_page": "Software Portability",
         "two_minute_explanation_target": "Explain environment mismatch failures.",
         "exit_criteria": ["c1", "c2", "c3"],
@@ -80,6 +86,7 @@ def _minimal_good_roadmap() -> dict:
             "Host OS → Docker daemon → image layers → container filesystem → app process. "
             "Show env mismatch paths avoided vs still possible."
         ),
+        "build_or_modify": "Add a Dockerfile for the same fleet-repair-lab repo.",
         "technologies_involved": [
             {
                 "technology": "Docker",
@@ -99,6 +106,7 @@ def _minimal_good_roadmap() -> dict:
         **copy.deepcopy(inv_portability),
         "title": "Why do services expose APIs?",
         "track": "general",
+        "build_or_modify": "Add an HTTP API module to the same cumulative repo.",
         "technologies_involved": [],
         "builds_on_prior_artifact": "src/machine_report.py",
         "artifact_this_investigation_produces": "src/api/",
@@ -110,6 +118,7 @@ def _minimal_good_roadmap() -> dict:
         **copy.deepcopy(inv_portability),
         "title": "Why do production systems need health checks?",
         "track": "general",
+        "build_or_modify": "Add health check endpoints to the same cumulative repo.",
         "technologies_involved": [],
         "builds_on_prior_artifact": "src/api/",
         "artifact_this_investigation_produces": "src/health/",
@@ -123,6 +132,7 @@ def _minimal_good_roadmap() -> dict:
         "track": "role_specific",
         "expensive_problem": "Fleet repair without a pipeline loses throughput.",
         "engineering_question": "How do telemetry, state machines, and metrics compose?",
+        "build_or_modify": "Add verification + postmortem evidence to the same repo.",
         "technologies_involved": [],
         "builds_on_prior_artifact": "src/health/",
         "artifact_this_investigation_produces": "docs/verification-log.md + postmortem",
@@ -147,6 +157,22 @@ fails in predictable ways. Map each failure back to an assumption.
 #### Visual System Model
 developer machine -> git -> runtime/deps/env/fs/os -> target machine
 
+#### Exact small project: machine-report
+Build machine-report that:
+- checks Python version
+- reads required env var APP_ENV
+- uses one external dependency
+- writes output/report.txt
+- logs what it is doing
+- fails clearly when required configuration is missing
+- includes README setup, a failure log, and an assumptions table
+
+#### Commands to run
+python -m venv .venv
+pip install -r requirements.txt
+set APP_ENV=dev
+python src/machine_report.py
+
 #### Subquestions
 - What breaks first when the runtime differs?
 - How do missing dependencies present?
@@ -156,19 +182,19 @@ developer machine -> git -> runtime/deps/env/fs/os -> target machine
 Watch a fresh machine fail setup.
 
 #### Build or Modify
-Create a tiny script with README setup.
+Implement machine-report as specified above.
 
 #### Intentionally Break / Debug
-Remove a dependency and change an env var.
+Unset APP_ENV; change Python version; remove the dependency.
 
 #### Improve
-Tighten setup instructions.
+Tighten setup instructions and assumptions table.
 
 #### GitHub evidence
-Repo with script, README, setup log.
+Repo with machine_report.py, README, failure log, assumptions table, output/report.txt.
 
 #### Obsidian evidence
-Engineering page: Software Portability.
+Engineering page: Software Portability — assumptions table and failure modes.
 
 #### Exit criteria
 - Can explain environment mismatch
@@ -179,6 +205,28 @@ Engineering page: Software Portability.
     # pad paste to >= 1000 chars if needed
     while len(paste) < 1000:
         paste += "\nAdditional notes on portability failure modes and layer assumptions."
+
+    titles = [
+        inv_portability["title"],
+        inv_api["title"],
+        inv_docker["title"],
+        inv_health["title"],
+        inv_capstone["title"],
+    ]
+    modules = [
+        "src/machine_report.py",
+        "src/api/",
+        "Dockerfile",
+        "src/health/",
+        "docs/verification-log.md",
+    ]
+    caps = [
+        "portability baseline",
+        "API boundary",
+        "container packaging",
+        "health checks",
+        "capstone verification",
+    ]
 
     return {
         "role_interpretation": {
@@ -197,7 +245,13 @@ Engineering page: Software Portability.
             ],
         },
         "expensive_problem_map": [],
-        "performance_requirements": [],
+        "performance_requirements": [
+            {
+                "requirement": "Common-path repair automation with escalation gates",
+                "source": "implied_by_jd",
+                "why_it_matters": "Throughput without unsafe full automation.",
+            }
+        ],
         "surface_keywords_vs_deep_skills": [],
         "candidate_transfer_map": {
             "transferable_intuition": [],
@@ -223,22 +277,22 @@ Engineering page: Software Portability.
         "skill_dependency_graph": [],
         "roadmap_tracks": {
             "general_engineering_track": [
-                "portability",
-                "python automation",
-                "apis",
-                "docker",
+                "software portability / machine-report",
+                "APIs",
+                "Why Docker exists",
+                "health checks",
             ],
             "role_specific_track": [
+                "GPU repair pipeline simulation capstone",
                 "repair state machine",
-                "telemetry",
-                "gpu repair pipeline",
+                "BMC/Redfish telemetry",
             ],
         },
         "cumulative_system": {
             "system_name": "fleet-repair-lab",
             "system_purpose": "Grow one fleet repair simulation system.",
             "why_this_system_matches_the_role": "Mirrors GPU fleet repair operations.",
-            "starting_scope": "portable machine report script",
+            "starting_scope": "portable machine-report script",
             "final_capstone_shape": (
                 "Verified repair pipeline with explicit escalation boundaries, "
                 "failure injection, and postmortem evidence."
@@ -247,18 +301,15 @@ Engineering page: Software Portability.
             "repo_growth_model": [
                 {
                     "investigation_number": n,
+                    "investigation_title": title,
                     "folder_or_module_added": mod,
                     "capability_added": cap,
                     "why_it_matters": "cumulative growth",
                     "evidence_created": "artifact",
                 }
-                for n, mod, cap in [
-                    (1, "src/machine_report.py", "portability baseline"),
-                    (2, "src/api/", "API boundary"),
-                    (3, "Dockerfile", "container packaging"),
-                    (4, "src/health/", "health checks"),
-                    (5, "docs/verification-log.md", "capstone verification"),
-                ]
+                for n, title, mod, cap in zip(
+                    range(1, 6), titles, modules, caps, strict=True
+                )
             ],
         },
         "investigation_roadmap": [
@@ -282,11 +333,11 @@ Engineering page: Software Portability.
                 "connected_investigations": [title],
             }
             for n, title, mod, cap, proof in [
-                (1, "foundation", "src/machine_report.py", "report", "setup log"),
-                (2, "api", "src/api/", "http", "api tests"),
-                (3, "docker", "Dockerfile", "image", "run log"),
-                (4, "health", "src/health/", "health", "health log"),
-                (5, "capstone", "docs/verification-log.md", "verify", "postmortem"),
+                (1, titles[0], modules[0], "report", "setup log"),
+                (2, titles[1], modules[1], "http", "api tests"),
+                (3, titles[2], modules[2], "image", "run log"),
+                (4, titles[3], modules[3], "health", "health log"),
+                (5, titles[4], modules[4], "verify", "postmortem"),
             ]
         ],
         "first_investigation_prompt": {
@@ -295,7 +346,7 @@ Engineering page: Software Portability.
             "engineering_question": "how does software move",
             "phase_0_mental_model": inv_portability["phase_0_mental_model"],
             "observe_first": "observe",
-            "build_or_modify": "build",
+            "build_or_modify": inv_portability["build_or_modify"],
             "intentionally_break_debug": "break",
             "improve": "improve",
         },
@@ -307,8 +358,13 @@ Engineering page: Software Portability.
                 "final_folder_structure": (
                     "fleet-repair-lab/\n"
                     "├── README.md\n"
+                    "├── Dockerfile\n"
                     "├── docs/\n"
+                    "│   └── verification-log.md\n"
                     "├── src/\n"
+                    "│   ├── machine_report.py\n"
+                    "│   ├── api/\n"
+                    "│   └── health/\n"
                     "├── tests/\n"
                     "└── outputs/\n"
                 ),
@@ -330,31 +386,36 @@ Engineering page: Software Portability.
         },
         "operational_metrics_contract": [
             {
-                "metric": "MTTD",
+                "metric": "MTTD (target: under 5 minutes)",
+                "source": "proposed_project_target",
                 "why_it_matters": "Fast detection protects fleet throughput.",
                 "how_to_measure_in_the_project": "Timestamp detect vs inject.",
                 "what_bad_result_means": "Blind spots in telemetry.",
             },
             {
-                "metric": "MTTR",
+                "metric": "MTTR (target: under 30 minutes)",
+                "source": "proposed_project_target",
                 "why_it_matters": "Return-to-service speed.",
                 "how_to_measure_in_the_project": "Timestamp repair start to green check.",
                 "what_bad_result_means": "Stuck repair queue.",
             },
             {
                 "metric": "false positive rate",
+                "source": "proposed_project_target",
                 "why_it_matters": "Noise burns operators.",
                 "how_to_measure_in_the_project": "Count bad alerts / total alerts.",
                 "what_bad_result_means": "Alert fatigue.",
             },
             {
                 "metric": "escalation rate",
+                "source": "implied_by_jd",
                 "why_it_matters": "Shows automation boundaries working.",
                 "how_to_measure_in_the_project": "Escalated / total repairs.",
                 "what_bad_result_means": "Automation too aggressive or too timid.",
             },
             {
                 "metric": "return-to-service pass rate",
+                "source": "proposed_project_target",
                 "why_it_matters": "Prevents reintroducing bad hosts.",
                 "how_to_measure_in_the_project": "Pass vs fail after repair.",
                 "what_bad_result_means": "Weak verification gate.",
@@ -393,8 +454,8 @@ Engineering page: Software Portability.
                 "failed return-to-service check",
             ],
             "required_measurements": [
-                "MTTD for injected faults",
-                "MTTR / return-to-service time",
+                "Target MTTD for injected faults",
+                "Target MTTR / return-to-service time",
                 "false positive notes",
             ],
             "required_docs": [
@@ -404,9 +465,11 @@ Engineering page: Software Portability.
                 "architecture diagram",
             ],
             "hiring_manager_readout": (
-                "I built one fleet-repair lab that starts with portability and grows "
-                "into a repair pipeline with measured MTTD/MTTR, explicit escalation, "
-                "and a postmortem proving failure was injected and verified."
+                "After completing this capstone, the candidate should be able to say: "
+                "this one fleet-repair lab starts with portability and grows into a "
+                "repair pipeline. Target measurement: MTTD/MTTR on injected faults. "
+                "Evidence to produce: escalation boundaries and a postmortem. "
+                "The final readout should include verification before return-to-service."
             ),
         },
         "interview_readiness_map": [
@@ -460,10 +523,105 @@ def test_good_minimal_roadmap_passes():
     validate_roadmap(_minimal_good_roadmap())
 
 
+def test_growth_title_mismatch_fails():
+    data = _minimal_good_roadmap()
+    data["cumulative_system"]["repo_growth_model"][2]["investigation_title"] = (
+        "Why do metrics and alerts exist?"
+    )
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "title mismatch" in str(exc.value).lower()
+
+
+def test_growth_module_mismatch_fails():
+    data = _minimal_good_roadmap()
+    data["cumulative_system"]["repo_growth_model"][1]["folder_or_module_added"] = (
+        "src/observability/"
+    )
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    msg = str(exc.value).lower()
+    assert "module mismatch" in msg or "does not appear" in msg
+
+
+def test_docker_role_specific_fails():
+    data = _minimal_good_roadmap()
+    data["investigation_roadmap"][2]["track"] = "role_specific"
+    data["roadmap_tracks"]["role_specific_track"].append("Why Docker exists")
+    # remove from general track matching
+    data["roadmap_tracks"]["general_engineering_track"] = [
+        e
+        for e in data["roadmap_tracks"]["general_engineering_track"]
+        if "docker" not in e.lower()
+    ]
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data, job_description="Own GPU fleet health and repair pipelines.")
+    assert "docker" in str(exc.value).lower()
+
+
+def test_stated_in_jd_fabricated_threshold_fails():
+    data = _minimal_good_roadmap()
+    data["operational_metrics_contract"][0]["source"] = "stated_in_jd"
+    jd = "Own Redfish and BMC tooling. Build repair pipelines for GPU fleet health."
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data, job_description=jd)
+    assert "stated_in_jd" in str(exc.value).lower() or "proposed_project_target" in str(
+        exc.value
+    ).lower()
+
+
+def test_fake_capstone_achievement_language_fails():
+    data = _minimal_good_roadmap()
+    data["capstone_proof_contract"]["hiring_manager_readout"] = (
+        "I built a fleet repair lab. I successfully validated the pipeline. "
+        "MTTD was consistently under 5 minutes and MTTR was maintained below 30 minutes. "
+        "I proved the system works."
+    )
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "fake" in str(exc.value).lower() or "achievement" in str(exc.value).lower()
+
+
+def test_vague_investigation_1_fails():
+    data = _minimal_good_roadmap()
+    vague = (
+        "### Phase 0 Mental Model\nUnderstand portability.\n\n"
+        "### observe\nLook around.\n\n### build\nCreate a simple application.\n\n"
+        "### break\nBreak it.\n\n### improve\nImprove it.\n\n"
+        "### GitHub\nPush code.\n\n### Obsidian\nTake notes.\n"
+    )
+    while len(vague) < 1000:
+        vague += "\nMore filler about creating a simple application without specifics."
+    data["first_investigation_prompt"]["ready_to_paste_prompt"] = vague
+    data["first_investigation_prompt"]["build_or_modify"] = "Create a simple application."
+    data["investigation_roadmap"][0]["build_or_modify"] = "Create a simple application."
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    msg = str(exc.value).lower()
+    assert "vague" in msg or "machine-report" in msg
+
+
+def test_redfish_required_when_in_jd():
+    data = _minimal_good_roadmap()
+    # Ensure no BMC/Redfish/IPMI in role-specific content
+    data["roadmap_tracks"]["role_specific_track"] = [
+        "GPU repair pipeline simulation capstone",
+        "repair state machine",
+        "hardware telemetry",
+    ]
+    jd = FLUIDSTACK_JD.read_text(encoding="utf-8") if FLUIDSTACK_JD.exists() else (
+        "Own Redfish and BMC tooling. Firmware-level telemetry and IPMI."
+    )
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data, job_description=jd)
+    assert "redfish" in str(exc.value).lower() or "bmc" in str(exc.value).lower()
+
+
 @pytest.mark.skipif(
     not FLUIDSTACK_ROADMAP.exists(),
     reason="Fluidstack generated roadmap JSON not present",
 )
 def test_fluidstack_generated_roadmap_passes():
     data = json.loads(FLUIDSTACK_ROADMAP.read_text(encoding="utf-8"))
-    validate_roadmap(data)
+    jd = FLUIDSTACK_JD.read_text(encoding="utf-8") if FLUIDSTACK_JD.exists() else None
+    validate_roadmap(data, job_description=jd)

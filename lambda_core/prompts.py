@@ -117,8 +117,11 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "source": {
                         "type": "string",
                         "description": (
-                            "'stated in JD' | 'likely implied' | "
-                            "'proposed project bar (not an employer requirement)'."
+                            "Exactly one of: 'stated_in_jd' | 'implied_by_jd' | "
+                            "'proposed_project_target'. "
+                            "Numeric thresholds (e.g. MTTD under 5 minutes) that are NOT "
+                            "literally in the JD MUST be proposed_project_target — never "
+                            "stated_in_jd. Trust is the product; do not fabricate precision."
                         ),
                     },
                     "why_it_matters": {"type": "string"},
@@ -335,11 +338,14 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "minItems": 4,
                     "maxItems": 12,
                     "description": (
-                        "General-value investigations ONLY. May include: software "
-                        "portability; Python automation; config/env; logging/errors; "
-                        "APIs; Why Docker exists; health checks; basic metrics. "
+                        "General-value investigations ONLY. MUST include Docker-style "
+                        "work here for software/systems/infrastructure roles "
+                        "(not in role_specific). May include: software portability; "
+                        "Python automation; config/env; logging/errors; APIs; Why "
+                        "Docker exists; health checks; basic metrics. "
                         "FORBIDDEN here: hardware telemetry, Redfish/BMC/IPMI, GPU "
-                        "repair/qualification/fleet repair workflows."
+                        "repair/qualification/fleet repair workflows. "
+                        "Each entry must correspond to a general-track investigation."
                     ),
                 },
                 "role_specific_track": {
@@ -349,9 +355,13 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "maxItems": 10,
                     "description": (
                         "JD-specific investigations ONLY. Fluidstack-like: repair "
-                        "state machines; hardware telemetry; Redfish/BMC/IPMI; GPU "
-                        "qualification; fleet ops; repair pipeline simulation; "
-                        "incident/postmortem discipline for fleet failures."
+                        "state machines; hardware telemetry; Redfish/BMC/IPMI "
+                        "concepts (name them explicitly — do not collapse into "
+                        "generic 'hardware telemetry'); GPU qualification; fleet "
+                        "ops; repair pipeline simulation; incident/postmortem "
+                        "verification. Docker is NOT role-specific unless the JD "
+                        "treats container infrastructure as a primary duty. "
+                        "Each entry must correspond to a role_specific investigation."
                     ),
                 },
             },
@@ -389,11 +399,21 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "type": "array",
                     "minItems": 5,
                     "maxItems": 12,
+                    "description": (
+                        "MUST have exactly one entry per investigation, same count "
+                        "as investigation_roadmap. investigation_number, "
+                        "investigation_title, and folder_or_module_added MUST match "
+                        "the corresponding investigation's index, title, and "
+                        "module_or_folder_added. Do NOT invent a different topic "
+                        "for the same investigation number (e.g. growth saying "
+                        "Inv 3 is observability while roadmap says Inv 3 is APIs)."
+                    ),
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
                         "required": [
                             "investigation_number",
+                            "investigation_title",
                             "folder_or_module_added",
                             "capability_added",
                             "why_it_matters",
@@ -401,9 +421,19 @@ CONTRACT_JSON_SCHEMA: dict = {
                         ],
                         "properties": {
                             "investigation_number": {"type": "integer"},
+                            "investigation_title": {
+                                "type": "string",
+                                "description": (
+                                    "Must match investigation_roadmap[N-1].title."
+                                ),
+                            },
                             "folder_or_module_added": {
                                 "type": "string",
-                                "description": "e.g. src/machine_report.py or src/api/",
+                                "description": (
+                                    "Must match that investigation's "
+                                    "module_or_folder_added "
+                                    "(e.g. src/machine_report.py or src/api/)."
+                                ),
                             },
                             "capability_added": {"type": "string"},
                             "why_it_matters": {"type": "string"},
@@ -544,7 +574,15 @@ CONTRACT_JSON_SCHEMA: dict = {
                     },
                     "module_or_folder_added": {
                         "type": "string",
-                        "description": "Path added to the cumulative repo this investigation.",
+                        "description": (
+                            "SPECIFIC path added to the cumulative repo this "
+                            "investigation — must exactly match "
+                            "repo_growth_model.folder_or_module_added and the "
+                            "matching proof_of_work_ladder.module_or_folder_added. "
+                            "Examples: src/machine_report.py, src/api/, Dockerfile, "
+                            "docs/verification-log.md. FORBIDDEN: vague paths like "
+                            "src/ or docs/ alone."
+                        ),
                     },
                     "delta_from_previous_investigation": {
                         "type": "string",
@@ -569,11 +607,13 @@ CONTRACT_JSON_SCHEMA: dict = {
         "proof_of_work_ladder": {
             "type": "array",
             "minItems": 5,
-            "maxItems": 10,
+            "maxItems": 12,
             "description": (
-                "ONE progressive system that grows. same_system_name MUST match "
-                "cumulative_system.system_name on EVERY level. Capstone is LAST. "
-                "NOT separate projects."
+                "ONE progressive system that grows. Count MUST equal "
+                "investigation_roadmap length. level N maps to investigation N; "
+                "module_or_folder_added MUST match that investigation. "
+                "same_system_name MUST match cumulative_system.system_name on EVERY "
+                "level. Capstone is LAST. NOT separate projects."
             ),
             "items": {
                 "type": "object",
@@ -592,12 +632,23 @@ CONTRACT_JSON_SCHEMA: dict = {
                 ],
                 "properties": {
                     "level": {"type": "integer"},
-                    "title": {"type": "string"},
+                    "title": {
+                        "type": "string",
+                        "description": (
+                            "Should reflect the matching investigation title/topic."
+                        ),
+                    },
                     "same_system_name": {
                         "type": "string",
                         "description": "Identical across all levels; role-shaped name.",
                     },
-                    "module_or_folder_added": {"type": "string"},
+                    "module_or_folder_added": {
+                        "type": "string",
+                        "description": (
+                            "Must match investigation_roadmap[level-1]."
+                            "module_or_folder_added."
+                        ),
+                    },
                     "extends_previous": {"type": "string"},
                     "new_capability_added": {"type": "string"},
                     "what_new_proof_it_creates": {"type": "string"},
@@ -619,9 +670,10 @@ CONTRACT_JSON_SCHEMA: dict = {
             "type": "object",
             "additionalProperties": False,
             "description": (
-                "Paste-ready Investigation 1. For software/systems roles: software "
-                "portability. FORBIDDEN: Docker, K8s, Prometheus, Grafana, Redfish "
-                "in this prompt."
+                "Paste-ready Investigation 1. For software/systems roles: a concrete "
+                "portability project named machine-report (NOT a vague 'create a "
+                "simple application'). FORBIDDEN: Docker, K8s, Prometheus, Grafana, "
+                "Redfish in this prompt."
             ),
             "required": [
                 "ready_to_paste_prompt",
@@ -644,11 +696,20 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "ready_to_paste_prompt": {
                     "type": "string",
                     "description": (
-                        "Complete multi-section prompt. MUST literally include the "
-                        "section headings containing these substrings: 'Phase 0', "
-                        "'mental model', 'observe', 'build', 'break', 'improve', "
-                        "'GitHub', 'Obsidian'. Phase 0 BEFORE build. Must not "
-                        "recommend Docker tutorials for Investigation 1."
+                        "Complete multi-section prompt. MUST literally include "
+                        "section headings containing: 'Phase 0', 'mental model', "
+                        "'observe', 'build', 'break', 'improve', 'GitHub', "
+                        "'Obsidian', plus commands to run, what to break, what to "
+                        "write in Obsidian, GitHub evidence, and exit criteria. "
+                        "MUST name the concrete project 'machine-report' (or "
+                        "machine_report) that: checks Python version; reads one "
+                        "required env var (e.g. APP_ENV); uses one external "
+                        "dependency; writes output/report.txt; logs what it is "
+                        "doing; fails clearly when required config is missing; "
+                        "includes README setup; includes a failure log; includes "
+                        "an assumptions table. Forbidden: vague language like "
+                        "'create a simple application' without the concrete "
+                        "machine-report spec. Must not recommend Docker."
                     ),
                 },
                 "expensive_problem": {"type": "string"},
@@ -669,7 +730,14 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "minItems": 3,
                 },
                 "observe_first": {"type": "string"},
-                "build_or_modify": {"type": "string"},
+                "build_or_modify": {
+                    "type": "string",
+                    "description": (
+                        "Must specify the concrete machine-report project "
+                        "(Python version check, APP_ENV, one dependency, "
+                        "output/report.txt, logging, clear config failure)."
+                    ),
+                },
                 "intentionally_break_debug": {"type": "string"},
                 "improve": {"type": "string"},
                 "github_evidence": {"type": "string"},
@@ -773,19 +841,31 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "Ops credibility metrics for production/GPU infrastructure roles. "
                 "Prefer MTTD, MTTR/time to return to service, false positive/negative "
                 "rate, repair queue depth, escalation rate, return-to-service pass rate, "
-                "telemetry freshness, alert noise rate."
+                "telemetry freshness, alert noise rate. "
+                "Numeric thresholds invented for the project (e.g. MTTD under 5 min, "
+                "MTTR under 30 min) MUST use source=proposed_project_target — they are "
+                "NOT stated JD facts unless the exact number appears in the JD."
             ),
             "items": {
                 "type": "object",
                 "additionalProperties": False,
                 "required": [
                     "metric",
+                    "source",
                     "why_it_matters",
                     "how_to_measure_in_the_project",
                     "what_bad_result_means",
                 ],
                 "properties": {
                     "metric": {"type": "string"},
+                    "source": {
+                        "type": "string",
+                        "description": (
+                            "Exactly one of: 'stated_in_jd' | 'implied_by_jd' | "
+                            "'proposed_project_target'. Reject inventing 'stated in JD' "
+                            "labels for model-invented measurements."
+                        ),
+                    },
                     "why_it_matters": {"type": "string"},
                     "how_to_measure_in_the_project": {"type": "string"},
                     "what_bad_result_means": {"type": "string"},
@@ -835,7 +915,11 @@ CONTRACT_JSON_SCHEMA: dict = {
                 "Capstone must prove readiness — not 'integrate everything'. "
                 "Must cover failure injection, verification logs, MTTD/MTTR, "
                 "escalation cases, FP/FN notes, postmortem, README, architecture "
-                "diagram, two-minute hiring-manager explanation."
+                "diagram, two-minute hiring-manager explanation. "
+                "CRITICAL: Project Lambda generates a ROADMAP, not fake achievements. "
+                "hiring_manager_readout and measurement language MUST be "
+                "future-facing / template language — never claim the user already "
+                "achieved results."
             ),
             "required": [
                 "what_it_must_demonstrate",
@@ -859,7 +943,10 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "type": "array",
                     "items": {"type": "string"},
                     "minItems": 3,
-                    "description": "Must include MTTD and MTTR (or time-to-return-to-service).",
+                    "description": (
+                        "Must include MTTD and MTTR (or time-to-return-to-service). "
+                        "Frame as targets/evidence to produce — not past achievements."
+                    ),
                 },
                 "required_docs": {
                     "type": "array",
@@ -872,7 +959,16 @@ CONTRACT_JSON_SCHEMA: dict = {
                 },
                 "hiring_manager_readout": {
                     "type": "string",
-                    "description": "Two-minute skeptical hiring-manager explanation.",
+                    "description": (
+                        "Future-facing two-minute template. REQUIRED framing like: "
+                        "'After completing this capstone, the candidate should be able "
+                        "to say…', 'Target measurement…', 'Evidence to produce…', "
+                        "'The final readout should include…'. "
+                        "FORBIDDEN past-tense fake success: 'I successfully validated', "
+                        "'MTTD was consistently under', 'MTTR was maintained below', "
+                        "'I built', 'I proved' — unless clearly marked as a future "
+                        "script the candidate will use after finishing the work."
+                    ),
                 },
             },
         },
@@ -952,11 +1048,12 @@ YOU ARE NOT:
 - a keyword-to-curriculum generator
 - a resume coach
 - a study-plan writer that says "learn Docker / learn Kubernetes"
+- a fabricator of fake completed achievements or fake JD precision
 
 YOU ARE:
 an engine that translates a job description + engineer background into:
 1) expensive engineering problems behind the role
-2) performance requirements
+2) performance requirements (with honest source labels)
 3) surface keywords vs deep skills (pain behind the keyword)
 4) candidate transferable intuition (NOT evidence)
 5) missing mental models and missing artifact evidence
@@ -965,7 +1062,7 @@ an engine that translates a job description + engineer background into:
 8) roadmap tracks: general_engineering vs role_specific
 9) progressive investigations (Phase 0 mental model BEFORE build)
 10) cumulative proof-of-work ladder (one growing system)
-11) a paste-ready first investigation prompt
+11) a paste-ready first investigation prompt (concrete machine-report)
 12) evidence plan + interview readiness + honest guardrail_checks
 
 CORE RULE — TECHNOLOGY IS A CONSEQUENCE OF PAIN
@@ -1021,6 +1118,30 @@ Redfish, or BMC.
 Docker may appear ONLY later as an investigation titled like
   "Why does Docker exist?"
 after the learner has felt local portability / environment mismatch pain.
+Docker belongs on the GENERAL engineering track for software/systems/
+infrastructure roles — NOT role_specific — unless the JD specifically treats
+container infrastructure as a primary role-specific duty.
+
+INVESTIGATION 1 — CONCRETE machine-report PROJECT (critical)
+Do NOT say vague things like "create a simple application."
+Default concrete project for software/systems roles:
+
+  Project: machine-report
+
+It must:
+- check Python version
+- read one required environment variable (e.g. APP_ENV)
+- use one external dependency
+- write output/report.txt
+- log what it is doing
+- fail clearly when required configuration is missing
+- include README setup instructions
+- include a failure log
+- include an assumptions table
+
+first_investigation_prompt.ready_to_paste_prompt MUST include:
+Phase 0 mental model, visual model, exact small project, commands to run,
+what to break, what to write in Obsidian, GitHub evidence, exit criteria.
 
 CANDIDATE EVIDENCE RULE
 Never treat background experience as software proof.
@@ -1033,18 +1154,44 @@ general_engineering_track ONLY:
   portability, Python automation, config/logs, APIs, Why Docker, health checks,
   basic metrics.
 role_specific_track ONLY:
-  repair state machines, hardware telemetry, Redfish/BMC/IPMI, GPU qualification,
-  fleet operations, repair pipeline simulation, incident/postmortem for fleet
-  failures, CAPSTONE last.
+  repair state machines, hardware telemetry, Redfish/BMC/IPMI (name explicitly),
+  GPU qualification, fleet operations, repair pipeline simulation,
+  incident/postmortem verification for fleet failures, CAPSTONE last.
 FORBIDDEN: putting hardware telemetry / Redfish / GPU repair / qualification in
 the general track.
+FORBIDDEN: putting Docker on the role_specific track for typical software/
+systems/infrastructure roles.
+Every investigation labeled `general` must appear in general_engineering_track.
+Every investigation labeled `role_specific` must appear in role_specific_track.
+
+PRESERVE ROLE-SPECIFIC TOOLING (critical)
+If the JD mentions Redfish, BMC, IPMI, firmware-level telemetry, or hardware
+lifecycle management, the roadmap MUST include an investigation or subquestion
+that explicitly names the relevant concept — e.g.
+  "How do BMC/Redfish-style interfaces expose hardware state?"
+It may be mocked. It does not need real hardware.
+Do NOT collapse Redfish/BMC/IPMI into only generic "hardware telemetry."
+
+ROADMAP CONSISTENCY (critical)
+These sections MUST agree with each other:
+  cumulative_system.repo_growth_model
+  investigation_roadmap
+  proof_of_work_ladder
+  evidence_plan.github_repository.final_folder_structure
+  roadmap_tracks
+Rules:
+- every investigation has a matching repo growth item (same number, title, module)
+- every investigation has a matching proof ladder level (same number/module)
+- no folder in repo growth unless it appears in the roadmap/ladder
+- no roadmap item without a repo growth module
+Reject inventing mismatched topics for the same investigation number.
 
 CUMULATIVE SINGLE-SYSTEM RULE (critical)
 Do NOT create many mini-repos (Software Portability Repo, Docker Repo, etc.).
 Create ONE cumulative system such as:
   fleet-repair-lab / gpu-fleet-ops-lab / compute-fleet-health-lab
 Populate cumulative_system with stable system_name + suggested_repo_name and a
-repo_growth_model (folder/module added each investigation).
+repo_growth_model (folder/module + investigation_title each investigation).
 proof_of_work_ladder.same_system_name MUST match cumulative_system.system_name
 on EVERY level.
 Each ladder level adds module_or_folder_added + new_capability_added +
@@ -1059,12 +1206,22 @@ AND proof_of_work_ladder MUST include a Docker-related artifact in the SAME repo
 e.g. Dockerfile, docker-compose.yml, docs/docker-portability-notes.md, or
 docs/containerization-tradeoffs.md. Never a separate Docker project.
 
+METRIC SOURCE HONESTY (critical)
+performance_requirements.source and operational_metrics_contract.source must be
+exactly one of:
+  stated_in_jd | implied_by_jd | proposed_project_target
+Numeric thresholds that do NOT appear in the JD (e.g. MTTD under 5 minutes,
+MTTR under 30 minutes for Fluidstack) MUST be proposed_project_target.
+Never label model-invented measurements as stated_in_jd / "stated in JD".
+Trust is the product. Do not fabricate precision.
+
 OPERATIONAL CREDIBILITY (critical)
 Fill role_interpretation.role_signature_claims with sharp role truths (not job
 summaries). Example style: "GPU failure is not a ticket; it is a fleet throughput
 problem."
 Fill operational_metrics_contract with measurable ops metrics (MTTD, MTTR /
-return-to-service, FP/FN rates, queue depth, escalation rate, alert noise, etc.).
+return-to-service, FP/FN rates, queue depth, escalation rate, alert noise, etc.)
+AND honest source labels.
 Fill automation_boundaries: safe_to_automate, requires_human_escalation,
 fail_closed_conditions, manual_approval_gates.
 Fill capstone_proof_contract with failure injections, MTTD/MTTR measurements,
@@ -1075,22 +1232,39 @@ REQUIRED framing instead:
   common-path automation, escalation for unsafe/ambiguous states, human review
   gates, fail-closed behavior, repair pipeline with explicit boundaries.
 
+NO FAKE ACCOMPLISHMENT LANGUAGE (critical)
+Project Lambda generates a roadmap, not fake achievements.
+capstone_proof_contract and hiring_manager_readout MUST NOT claim the user
+already achieved results.
+FORBIDDEN unless clearly framed as a future target/template:
+  "I successfully validated", "MTTD was consistently under",
+  "MTTR was maintained below", "I built", "I proved"
+REQUIRED framing:
+  "After completing this capstone, the candidate should be able to say…"
+  "Target measurement…"
+  "Evidence to produce…"
+  "The final readout should include…"
+
 FLUIDSTACK-LIKE PROGRESSION (adapt titles; keep order spirit)
-1. How does software move between machines and still work? (NO Docker) [general]
+1. How does software move between machines and still work? (NO Docker)
+   → concrete machine-report project [general]
 2. Python automation with config, logs, clear failure modes [general]
 3. Why do services expose APIs? [general]
 4. Why does Docker exist? [general] + Dockerfile (or equivalent) in same repo
 5. Why do production systems need health checks? [general]
 6. Why do metrics and alerts exist? [general]
 7. Why does repair become a state machine? [role_specific]
-8. How does hardware telemetry expose fleet health? [role_specific]
+8. How do BMC/Redfish-style interfaces expose hardware state?
+   (or equivalent explicit BMC/Redfish/IPMI investigation) [role_specific]
 9. How would a GPU repair pipeline simulation work? [role_specific]
-10. Capstone verification + incident/postmortem evidence on SAME repo [role_specific]
+10. Capstone verification + incident/postmortem evidence on SAME repo
+    [role_specific] — future-facing proof contract only
 
 OUTPUT
 Match the JSON schema exactly.
 Fill guardrail_checks honestly.
-Be concrete, problem-first, cumulative, and hiring-manager credible.
+Be concrete, problem-first, cumulative, consistent across sections, and
+hiring-manager credible without fabricating completed results.
 """
 
 
@@ -1098,10 +1272,15 @@ def build_user_prompt(job_description: str, engineer_profile: str) -> str:
     return f"""Generate a Project Lambda Role-to-Roadmap for this engineer.
 
 Hard requirements for THIS run:
-1. Investigation 1 = software portability / environment mismatch. NO Docker.
-2. Docker only later as "Why does Docker exist?" after portability pain. If Docker
-   investigation exists, add Dockerfile (or docker-compose / docker docs) to the
-   SAME cumulative repo growth model and proof ladder — not a separate project.
+1. Investigation 1 = software portability / environment mismatch via a concrete
+   machine-report project (Python version check, APP_ENV, one dependency,
+   output/report.txt, logging, clear config failure, README, failure log,
+   assumptions table). NO Docker. NO vague "create a simple application."
+2. Docker only later as "Why does Docker exist?" after portability pain. Docker
+   is GENERAL track (not role_specific) unless the JD treats container
+   infrastructure as a primary role-specific duty. If Docker investigation
+   exists, add Dockerfile (or docker-compose / docker docs) to the SAME
+   cumulative repo growth model and proof ladder.
 3. EVERY investigation (including Capstone): Phase 0 mental model (>=300 chars)
    that literally uses at least two of these exact words: because, depends,
    layer, failure, assumption, runtime, dependency, environment, signal, state.
@@ -1109,19 +1288,41 @@ Hard requirements for THIS run:
 4. role_signature_claims: >=4 sharp engineering truths (not generic summaries).
 5. NEVER say fully automated / no humans needed / complete automation /
    automated everything. Use common-path automation + escalation + fail-closed.
-6. Fill operational_metrics_contract (include MTTD and MTTR or return-to-service).
+6. Fill operational_metrics_contract (include MTTD and MTTR or return-to-service)
+   with source exactly one of: stated_in_jd | implied_by_jd |
+   proposed_project_target. Invented numeric thresholds (e.g. MTTD <5 min,
+   MTTR <30 min) MUST be proposed_project_target — never stated_in_jd.
+   Same honesty for performance_requirements.source.
 7. Fill automation_boundaries (safe / escalate / fail-closed / approval gates).
 8. Fill capstone_proof_contract with failure injections, MTTD/MTTR measurements,
-   verification + postmortem docs, hiring_manager_readout.
+   verification + postmortem docs, hiring_manager_readout. Readout MUST be
+   future-facing ("After completing…", "Target…", "Evidence to produce…") —
+   NEVER fake past-tense success ("I built", "I proved", "MTTD was under…").
 9. ONE cumulative system; stable same_system_name; one github_repository with a
    multi-line final_folder_structure tree (>=80 chars showing README/docs/src/
    Dockerfile/tests/outputs).
-10. Capstone LAST with real proof beyond prior integration. Final
-    capstone_delta MUST literally mention: failure injection, MTTD, MTTR
-    (or return-to-service), and postmortem/verification.
-11. first_investigation_prompt paste-ready with Phase 0 / mental model / observe /
-    build / break / improve / GitHub / Obsidian; no Docker.
-12. Fill guardrail_checks honestly.
+10. ROADMAP CONSISTENCY: repo_growth_model, investigation_roadmap,
+    proof_of_work_ladder, final_folder_structure, and roadmap_tracks MUST agree.
+    Same investigation numbers, titles, and modules. Growth count = ladder
+    count = investigation count. Every growth folder appears in roadmap/ladder.
+    module_or_folder_added must be a SPECIFIC path identical across roadmap,
+    growth, and ladder (e.g. src/machine_report.py) — NEVER vague 'src/' alone.
+11. Capstone LAST with real proof beyond prior integration. The FINAL
+    investigation title should include Capstone/verification/postmortem language.
+    A mid/late 'GPU repair pipeline simulation' investigation may exist BEFORE
+    the final Capstone, but only the LAST item gets a real capstone_delta.
+    Final capstone_delta MUST literally mention: failure injection, MTTD, MTTR
+    (or return-to-service), and postmortem/verification. Non-final use
+    'n/a — not the capstone'.
+12. first_investigation_prompt paste-ready with Phase 0 / mental model / observe /
+    build / break / improve / GitHub / Obsidian / commands / exit criteria;
+    names machine-report; no Docker.
+13. If the JD mentions Redfish, BMC, IPMI, or firmware-level telemetry, include
+    an explicit role_specific investigation or subquestion naming that concept
+    (do not collapse to only "hardware telemetry").
+14. Track discipline: general investigations appear in general_engineering_track;
+    role_specific ones appear in role_specific_track.
+15. Fill guardrail_checks honestly.
 
 === JOB DESCRIPTION ===
 {job_description.strip()}

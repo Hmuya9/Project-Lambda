@@ -10,7 +10,7 @@ from typing import Any
 from openai import OpenAI
 
 from lambda_core.prompts import CONTRACT_JSON_SCHEMA, SYSTEM_PROMPT, build_user_prompt
-from lambda_core.validate import validate_roadmap
+from lambda_core.validate import ValidationError, validate_roadmap
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -75,14 +75,8 @@ def _client(api_key: str, base_url: str | None = None) -> OpenAI:
     return OpenAI(api_key=api_key)
 
 
-def generate_contract(job_description: str, engineer_profile: str) -> dict[str, Any]:
-    api_key, model, base_url = resolve_config()
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is missing or blank (set it in .env).")
-    client = _client(api_key, base_url)
-    user_prompt = build_user_prompt(job_description, engineer_profile)
-
-    # Prefer structured outputs when the backend supports them; fall back to JSON mode.
+def _call_model(client: OpenAI, model: str, user_prompt: str) -> dict[str, Any]:
+    """Call the model once and return parsed JSON (keys checked)."""
     try:
         response = client.chat.completions.create(
             model=model,
@@ -121,8 +115,42 @@ def generate_contract(job_description: str, engineer_profile: str) -> dict[str, 
         raise RuntimeError("Model returned empty content.")
     data = json.loads(content)
     _require_keys(data)
-    validate_roadmap(data)
     return data
+
+
+def generate_contract(job_description: str, engineer_profile: str) -> dict[str, Any]:
+    api_key, model, base_url = resolve_config()
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is missing or blank (set it in .env).")
+    client = _client(api_key, base_url)
+    user_prompt = build_user_prompt(job_description, engineer_profile)
+
+    data = _call_model(client, model, user_prompt)
+    try:
+        validate_roadmap(data, job_description=job_description)
+        return data
+    except ValidationError as first_err:
+        # One repair pass: feed validation failures back; do not silently invent fixes.
+        print(
+            "Validation failed; retrying once with validator feedback...",
+            file=sys.stderr,
+        )
+        repair_prompt = (
+            user_prompt
+            + "\n\n=== PREVIOUS OUTPUT FAILED VALIDATION — FIX THESE EXACTLY ===\n"
+            + str(first_err)
+            + "\n\nRegenerate the FULL corrected JSON. Keep roadmap consistency: "
+            "identical investigation numbers/titles/modules across "
+            "investigation_roadmap, repo_growth_model, and proof_of_work_ladder. "
+            "Every phase_0_mental_model must use >=2 causal/layer words "
+            "(because, depends, layer, failure, assumption, runtime, dependency, "
+            "environment, signal, state). Capstone readout must be future-facing. "
+            "Metric sources must be honest (proposed_project_target for invented "
+            "thresholds). Investigation 1 must be concrete machine-report."
+        )
+        data = _call_model(client, model, repair_prompt)
+        validate_roadmap(data, job_description=job_description)
+        return data
 
 
 REQUIRED_TOP_LEVEL = [
