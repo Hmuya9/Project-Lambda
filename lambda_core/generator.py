@@ -9,6 +9,7 @@ from typing import Any
 
 from openai import OpenAI
 
+from lambda_core.align import align_roadmap_structure
 from lambda_core.prompts import CONTRACT_JSON_SCHEMA, SYSTEM_PROMPT, build_user_prompt
 from lambda_core.validate import ValidationError, validate_roadmap
 
@@ -113,7 +114,10 @@ def _call_model(client: OpenAI, model: str, user_prompt: str) -> dict[str, Any]:
     content = response.choices[0].message.content
     if not content:
         raise RuntimeError("Model returned empty content.")
-    data = json.loads(content)
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Model returned invalid JSON: {exc}") from exc
     _require_keys(data)
     return data
 
@@ -126,34 +130,51 @@ def generate_contract(job_description: str, engineer_profile: str) -> dict[str, 
     user_prompt = build_user_prompt(job_description, engineer_profile)
 
     data = _call_model(client, model, user_prompt)
-    try:
-        validate_roadmap(data, job_description=job_description)
-        return data
-    except ValidationError as first_err:
-        # One repair pass: feed validation failures back; do not silently invent fixes.
-        print(
-            "Validation failed; retrying once with validator feedback...",
-            file=sys.stderr,
-        )
-        repair_prompt = (
-            user_prompt
-            + "\n\n=== PREVIOUS OUTPUT FAILED VALIDATION — FIX THESE EXACTLY ===\n"
-            + str(first_err)
-            + "\n\nRegenerate the FULL corrected JSON. Keep roadmap consistency: "
-            "identical investigation numbers/titles/modules across "
-            "investigation_roadmap, repo_growth_model, and proof_of_work_ladder. "
-            "Every phase_0_mental_model must use >=2 causal/layer words "
-            "(because, depends, layer, failure, assumption, runtime, dependency, "
-            "environment, signal, state). Capstone readout must be future-facing. "
-            "Metric sources must be honest (proposed_project_target for invented "
-            "thresholds). Investigation 1 must be concrete machine-report."
-        )
-        data = _call_model(client, model, repair_prompt)
-        validate_roadmap(data, job_description=job_description)
-        return data
+    last_err: Exception | None = None
+    for attempt in range(2):
+        align_roadmap_structure(data, job_description=job_description)
+        try:
+            validate_roadmap(data, job_description=job_description)
+            return data
+        except (ValidationError, RuntimeError) as err:
+            last_err = err
+            print(
+                f"Validation/generation issue (attempt {attempt + 1}); retrying...",
+                file=sys.stderr,
+            )
+            repair_prompt = (
+                user_prompt
+                + "\n\n=== PREVIOUS OUTPUT FAILED — FIX THESE EXACTLY ===\n"
+                + str(err)
+                + "\n\nRegenerate the FULL corrected JSON with these non-negotiables:\n"
+                "- role_family must match THIS JD (model-serving vs fleet-repair).\n"
+                "- Prefer 8–10 investigations total. Capstone MUST be the LAST item.\n"
+                "- Every investigation needs specific module_or_folder_added.\n"
+                "- roadmap_tracks titles are SHORT exact copies of investigation titles.\n"
+                "- No BMC/Redfish/GPU repair unless JD supports them.\n"
+                "- Capstone + cumulative system names match role_family.\n"
+                "- Proposed metrics: latency/throughput/error rate/queue/MTTD/MTTR.\n"
+                "- missing_mental_models pointers must be exact investigation titles.\n"
+                "- Investigation 1 = machine-report; paste prompt includes Phase 0, "
+                "mental model, observe, build, break, improve, GitHub, Obsidian.\n"
+                "- Every phase_0_mental_model uses >=2 causal/layer words; every "
+                "visual_system_model includes -> or layer/flow/pipeline/state.\n"
+                "- Return complete valid JSON only."
+            )
+            try:
+                data = _call_model(client, model, repair_prompt)
+            except RuntimeError as gen_err:
+                last_err = gen_err
+                # Try one more clean generation without repair context if JSON broke
+                data = _call_model(client, model, user_prompt)
+    assert last_err is not None
+    align_roadmap_structure(data, job_description=job_description)
+    validate_roadmap(data, job_description=job_description)
+    return data
 
 
 REQUIRED_TOP_LEVEL = [
+    "role_family",
     "role_interpretation",
     "expensive_problem_map",
     "performance_requirements",

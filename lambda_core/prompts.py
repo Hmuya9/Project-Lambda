@@ -9,6 +9,7 @@ CONTRACT_JSON_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
     "required": [
+        "role_family",
         "role_interpretation",
         "expensive_problem_map",
         "performance_requirements",
@@ -30,6 +31,53 @@ CONTRACT_JSON_SCHEMA: dict = {
         "guardrail_checks",
     ],
     "properties": {
+        "role_family": {
+            "type": "object",
+            "additionalProperties": False,
+            "description": (
+                "Classify the role FIRST. Role-specific investigations, cumulative "
+                "system name, metrics, and capstone MUST follow this family. "
+                "Do NOT default to GPU fleet repair / BMC / Redfish unless the JD "
+                "explicitly supports that family."
+            ),
+            "required": [
+                "primary_family",
+                "secondary_families",
+                "why_this_family",
+                "excluded_families",
+            ],
+            "properties": {
+                "primary_family": {
+                    "type": "string",
+                    "description": (
+                        "Exactly one of: ai_infrastructure_model_serving | "
+                        "gpu_fleet_production_engineering | "
+                        "backend_platform_engineering | robotics_systems | "
+                        "embedded_ai | cloud_infrastructure | "
+                        "controls_automation_software | "
+                        "data_center_compute_infrastructure | "
+                        "general_systems_software"
+                    ),
+                },
+                "secondary_families": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "why_this_family": {
+                    "type": "string",
+                    "description": "Cite JD evidence for the chosen family.",
+                },
+                "excluded_families": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Families that would be a misread of this JD "
+                        "(e.g. exclude gpu_fleet_production_engineering for a "
+                        "model-serving AI infra role)."
+                    ),
+                },
+            },
+        },
         "role_interpretation": {
             "type": "object",
             "additionalProperties": False,
@@ -50,7 +98,8 @@ CONTRACT_JSON_SCHEMA: dict = {
                         "'complete automation', 'automated everything'. "
                         "REQUIRED framing: common-path automation with escalation "
                         "for unsafe/ambiguous states, human review gates, "
-                        "fail-closed behavior, explicit repair-pipeline boundaries."
+                        "fail-closed behavior, and explicit operational boundaries "
+                        "appropriate to the role family."
                     ),
                 },
                 "what_this_role_is_not": {
@@ -64,13 +113,14 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "minItems": 4,
                     "maxItems": 8,
                     "description": (
-                        "Sharp engineering truths of THIS job — not generic summaries. "
-                        "Fluidstack-like examples: 'GPU failure is not a ticket; it is a "
-                        "fleet throughput problem.'; 'Repair must become a pipeline, not "
-                        "a manual procedure.'; 'Health visibility must come from real "
-                        "signals, not vibes.'; 'Hardware qualification must define "
-                        "production-ready before the fleet goes live.'; 'Automation "
-                        "must know when to stop and escalate.'"
+                        "Sharp engineering truths of THIS job and role family — not "
+                        "generic summaries and not copied from a different family. "
+                        "Fleet/repair examples only when JD supports fleet repair. "
+                        "Model-serving examples: 'Inference latency is a product "
+                        "feature, not a nice-to-have.'; 'Batching improves throughput "
+                        "but can hurt tail latency.'; 'GPU utilization without SLO "
+                        "discipline is a false win.'; 'Observability must expose queue "
+                        "depth, token throughput, and cold starts — not vibes.'"
                     ),
                     "items": {"type": "string"},
                 },
@@ -338,14 +388,9 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "minItems": 4,
                     "maxItems": 12,
                     "description": (
-                        "General-value investigations ONLY. MUST include Docker-style "
-                        "work here for software/systems/infrastructure roles "
-                        "(not in role_specific). May include: software portability; "
-                        "Python automation; config/env; logging/errors; APIs; Why "
-                        "Docker exists; health checks; basic metrics. "
-                        "FORBIDDEN here: hardware telemetry, Redfish/BMC/IPMI, GPU "
-                        "repair/qualification/fleet repair workflows. "
-                        "Each entry must correspond to a general-track investigation."
+                        "SHORT TITLES ONLY — exact copies of investigation_roadmap "
+                        "titles where track='general'. No paragraphs. No extras. "
+                        "Every general investigation title must appear exactly once."
                     ),
                 },
                 "role_specific_track": {
@@ -354,14 +399,13 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "minItems": 3,
                     "maxItems": 10,
                     "description": (
-                        "JD-specific investigations ONLY. Fluidstack-like: repair "
-                        "state machines; hardware telemetry; Redfish/BMC/IPMI "
-                        "concepts (name them explicitly — do not collapse into "
-                        "generic 'hardware telemetry'); GPU qualification; fleet "
-                        "ops; repair pipeline simulation; incident/postmortem "
-                        "verification. Docker is NOT role-specific unless the JD "
-                        "treats container infrastructure as a primary duty. "
-                        "Each entry must correspond to a role_specific investigation."
+                        "SHORT TITLES ONLY — exact copies of investigation_roadmap "
+                        "titles where track='role_specific'. No paragraphs. No "
+                        "extras. Role-specific titles MUST match the chosen "
+                        "role_family (model serving vs fleet repair). Docker is NOT "
+                        "role-specific unless the JD treats container infrastructure "
+                        "as a primary duty. BMC/Redfish/GPU repair titles ONLY when "
+                        "the JD explicitly supports them."
                     ),
                 },
             },
@@ -371,8 +415,12 @@ CONTRACT_JSON_SCHEMA: dict = {
             "additionalProperties": False,
             "description": (
                 "ONE growing engineering artifact — not many mini-projects. "
-                "For Fluidstack-like roles use a role-shaped name like "
-                "fleet-repair-lab / gpu-fleet-ops-lab / compute-fleet-health-lab. "
+                "Name MUST match role_family: "
+                "ai_infrastructure_model_serving → ai-inference-reliability-lab / "
+                "model-serving-ops-lab / inference-platform-lab; "
+                "gpu_fleet_production_engineering → fleet-repair-lab / "
+                "gpu-fleet-ops-lab / compute-fleet-health-lab. "
+                "FORBIDDEN: defaulting every AI job to fleet-repair. "
                 "FORBIDDEN names: Software Portability, Python Automation, "
                 "Docker Project, API Project."
             ),
@@ -635,7 +683,7 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "title": {
                         "type": "string",
                         "description": (
-                            "Should reflect the matching investigation title/topic."
+                            "MUST exactly equal investigation_roadmap[level-1].title."
                         ),
                     },
                     "same_system_name": {
@@ -662,6 +710,11 @@ CONTRACT_JSON_SCHEMA: dict = {
                         "type": "array",
                         "items": {"type": "string"},
                         "minItems": 1,
+                        "description": (
+                            "MUST include this level's own investigation title "
+                            "(investigation_roadmap[level-1].title). Do not point "
+                            "only at the next investigation."
+                        ),
                     },
                 },
             },
@@ -838,13 +891,17 @@ CONTRACT_JSON_SCHEMA: dict = {
             "minItems": 5,
             "maxItems": 12,
             "description": (
-                "Ops credibility metrics for production/GPU infrastructure roles. "
-                "Prefer MTTD, MTTR/time to return to service, false positive/negative "
-                "rate, repair queue depth, escalation rate, return-to-service pass rate, "
-                "telemetry freshness, alert noise rate. "
-                "Numeric thresholds invented for the project (e.g. MTTD under 5 min, "
-                "MTTR under 30 min) MUST use source=proposed_project_target — they are "
-                "NOT stated JD facts unless the exact number appears in the JD."
+                "Ops metrics measurable INSIDE the cumulative project. "
+                "Match role_family: model serving → request count, error rate, "
+                "P50/P95/P99 latency, throughput req/s, queue depth, batch size, "
+                "simulated GPU utilization, CPU/memory, cold start, MTTD/MTTR for "
+                "simulated service incidents, alert noise. "
+                "Fleet repair → MTTD, MTTR/return-to-service, FP/FN, telemetry "
+                "freshness, repair queue depth, escalation rate, RTS pass rate. "
+                "FORBIDDEN as proposed project metrics unless JD+project support a "
+                "proxy: user/customer satisfaction, revenue impact, broad business "
+                "KPIs, six-month org targets. "
+                "Invented numeric thresholds MUST use proposed_project_target."
             ),
             "items": {
                 "type": "object",
@@ -1052,6 +1109,7 @@ YOU ARE NOT:
 
 YOU ARE:
 an engine that translates a job description + engineer background into:
+0) role_family classification (FIRST — routes everything else)
 1) expensive engineering problems behind the role
 2) performance requirements (with honest source labels)
 3) surface keywords vs deep skills (pain behind the keyword)
@@ -1064,6 +1122,11 @@ an engine that translates a job description + engineer background into:
 10) cumulative proof-of-work ladder (one growing system)
 11) a paste-ready first investigation prompt (concrete machine-report)
 12) evidence plan + interview readiness + honest guardrail_checks
+
+CRITICAL ANTI-OVERFIT RULE
+Do NOT default every AI / GPU job to Fluidstack-style fleet repair,
+BMC/Redfish, hardware RMA, or GPU repair pipeline simulation.
+Classify role_family from the JD, then generate role-specific work for THAT family.
 
 CORE RULE — TECHNOLOGY IS A CONSEQUENCE OF PAIN
 Never introduce a technology before explaining the engineering pain that caused
@@ -1149,122 +1212,143 @@ Field/industrial/hardware intuition transfers — but Linux fluency, Python
 automation, APIs, Docker, etc. still require artifacts (repo, setup log, README,
 shell notes, troubleshooting notes, diagrams, benchmarks).
 
-ROADMAP TRACKS
-general_engineering_track ONLY:
-  portability, Python automation, config/logs, APIs, Why Docker, health checks,
-  basic metrics.
-role_specific_track ONLY:
-  repair state machines, hardware telemetry, Redfish/BMC/IPMI (name explicitly),
-  GPU qualification, fleet operations, repair pipeline simulation,
-  incident/postmortem verification for fleet failures, CAPSTONE last.
-FORBIDDEN: putting hardware telemetry / Redfish / GPU repair / qualification in
-the general track.
-FORBIDDEN: putting Docker on the role_specific track for typical software/
-systems/infrastructure roles.
-Every investigation labeled `general` must appear in general_engineering_track.
-Every investigation labeled `role_specific` must appear in role_specific_track.
+ROLE FAMILY CLASSIFICATION (do this first)
+Fill role_family.primary_family with exactly one allowed value:
+  ai_infrastructure_model_serving
+  gpu_fleet_production_engineering
+  backend_platform_engineering
+  robotics_systems
+  embedded_ai
+  cloud_infrastructure
+  controls_automation_software
+  data_center_compute_infrastructure
+  general_systems_software
 
-PRESERVE ROLE-SPECIFIC TOOLING (critical)
-If the JD mentions Redfish, BMC, IPMI, firmware-level telemetry, or hardware
-lifecycle management, the roadmap MUST include an investigation or subquestion
-that explicitly names the relevant concept — e.g.
-  "How do BMC/Redfish-style interfaces expose hardware state?"
-It may be mocked. It does not need real hardware.
-Do NOT collapse Redfish/BMC/IPMI into only generic "hardware telemetry."
+Routing evidence:
+- Mentions model serving / inference / vLLM / Triton / latency budgets /
+  token throughput / $/token / cold starts → ai_infrastructure_model_serving
+- Mentions repair pipeline / RMA / return to service / BMC / Redfish / IPMI /
+  firmware telemetry / bare metal lifecycle / hardware qualification /
+  physical fleet repair → gpu_fleet_production_engineering
+Do NOT pick gpu_fleet_production_engineering merely because GPUs appear.
+
+ROLE-FAMILY ROLE-SPECIFIC ROUTING
+If primary_family = ai_infrastructure_model_serving, role-specific work should
+usually include several of:
+  How does an AI model become a service?
+  Why do inference systems care about latency and throughput?
+  Why do batching and queues improve throughput but hurt latency?
+  How do we measure P50/P95/P99 latency?
+  How do model-serving systems fail under load?
+  How do we observe an inference service?
+  How do CPU/GPU resource constraints affect inference?
+  How do we load test and diagnose bottlenecks?
+  Capstone: Local Inference Service Reliability Lab
+Cumulative system names like:
+  ai-inference-reliability-lab / model-serving-ops-lab / inference-platform-lab
+FORBIDDEN unless JD explicitly supports fleet/hardware repair:
+  GPU repair pipeline simulation, BMC/Redfish/IPMI, hardware fleet repair,
+  repair state machines, RMA automation.
+
+If primary_family = gpu_fleet_production_engineering, role-specific work may
+include:
+  repair state machines; BMC/Redfish/IPMI (named explicitly); hardware
+  telemetry; GPU qualification; repair pipeline simulation; fleet health;
+  incident/postmortem verification.
+Cumulative system names like:
+  fleet-repair-lab / gpu-fleet-ops-lab / compute-fleet-health-lab
+
+PRESERVE ROLE-SPECIFIC TOOLING ONLY WHEN JD SUPPORTS IT
+If AND ONLY IF the JD mentions Redfish, BMC, IPMI, firmware-level telemetry,
+hardware lifecycle, RMA, repair pipeline, or physical fleet operations, include
+an investigation/subquestion that explicitly names the concept.
+If the JD does NOT mention those, do NOT invent BMC/Redfish/GPU repair tracks.
+
+ROADMAP TRACKS (exact title matching)
+roadmap_tracks.*. entries MUST be SHORT TITLES ONLY (no paragraphs).
+Each general_engineering_track title MUST exactly equal one investigation
+title with track=general.
+Each role_specific_track title MUST exactly equal one investigation title
+with track=role_specific.
+Every investigation title appears in exactly one track. No extras.
+FORBIDDEN: putting Docker on role_specific for typical software/systems roles.
 
 ROADMAP CONSISTENCY (critical)
-These sections MUST agree with each other:
+These sections MUST agree:
   cumulative_system.repo_growth_model
   investigation_roadmap
   proof_of_work_ladder
   evidence_plan.github_repository.final_folder_structure
   roadmap_tracks
 Rules:
-- every investigation has a matching repo growth item (same number, title, module)
-- every investigation has a matching proof ladder level (same number/module)
-- no folder in repo growth unless it appears in the roadmap/ladder
-- no roadmap item without a repo growth module
-Reject inventing mismatched topics for the same investigation number.
+- every investigation has matching repo growth item (number, title, module)
+- every investigation has matching proof ladder level
+- proof_of_work_ladder[i].title == investigation_roadmap[i].title
+- proof_of_work_ladder[i].connected_investigations includes that same title
+- no folder in repo growth unless it appears in roadmap/ladder
 
 CUMULATIVE SINGLE-SYSTEM RULE (critical)
-Do NOT create many mini-repos (Software Portability Repo, Docker Repo, etc.).
-Create ONE cumulative system such as:
-  fleet-repair-lab / gpu-fleet-ops-lab / compute-fleet-health-lab
-Populate cumulative_system with stable system_name + suggested_repo_name and a
-repo_growth_model (folder/module + investigation_title each investigation).
-proof_of_work_ladder.same_system_name MUST match cumulative_system.system_name
-on EVERY level.
-Each ladder level adds module_or_folder_added + new_capability_added +
-what_new_proof_it_creates + why_this_is_not_a_separate_project.
-evidence_plan.github_repository describes ONE repo tree (README, docs/, src/,
-tests/, outputs/) — never a list of many repos.
-Capstone is the mature version of the SAME repo.
+ONE cumulative system named for the role_family (see above).
+NOT many mini-repos. Capstone is the mature version of the SAME repo.
+proof_of_work_ladder.same_system_name MUST match cumulative_system.system_name.
 
 DOCKER MODULE CONSISTENCY
-If an investigation is "Why does Docker exist?", cumulative_system.repo_growth_model
-AND proof_of_work_ladder MUST include a Docker-related artifact in the SAME repo,
-e.g. Dockerfile, docker-compose.yml, docs/docker-portability-notes.md, or
-docs/containerization-tradeoffs.md. Never a separate Docker project.
+If an investigation is "Why does Docker exist?", add Dockerfile /
+docker-compose / docker docs to the SAME repo growth model and proof ladder.
 
-METRIC SOURCE HONESTY (critical)
-performance_requirements.source and operational_metrics_contract.source must be
-exactly one of:
-  stated_in_jd | implied_by_jd | proposed_project_target
-Numeric thresholds that do NOT appear in the JD (e.g. MTTD under 5 minutes,
-MTTR under 30 minutes for Fluidstack) MUST be proposed_project_target.
-Never label model-invented measurements as stated_in_jd / "stated in JD".
-Trust is the product. Do not fabricate precision.
+METRIC SOURCE + MEASURABILITY (critical)
+source must be stated_in_jd | implied_by_jd | proposed_project_target.
+Invented numeric thresholds → proposed_project_target.
+Proposed metrics MUST be measurable by the cumulative project artifacts.
+Prefer family-appropriate metrics (latency/throughput for serving; MTTD/MTTR/
+return-to-service for fleet repair).
+FORBIDDEN proposed metrics: user/customer satisfaction, revenue impact, broad
+business KPIs, six-month org targets — unless JD states them AND the project
+has an explicit simulation/proxy.
 
-OPERATIONAL CREDIBILITY (critical)
-Fill role_interpretation.role_signature_claims with sharp role truths (not job
-summaries). Example style: "GPU failure is not a ticket; it is a fleet throughput
-problem."
-Fill operational_metrics_contract with measurable ops metrics (MTTD, MTTR /
-return-to-service, FP/FN rates, queue depth, escalation rate, alert noise, etc.)
-AND honest source labels.
-Fill automation_boundaries: safe_to_automate, requires_human_escalation,
-fail_closed_conditions, manual_approval_gates.
-Fill capstone_proof_contract with failure injections, MTTD/MTTR measurements,
-verification/postmortem docs, and a hiring_manager_readout.
-FORBIDDEN absolute automation language anywhere:
+MISSING MENTAL MODEL MAPPING
+missing_mental_models[].first_investigation_that_builds_it MUST name an
+investigation title that actually builds that model.
+Observability/metrics/alerting models must NOT point at the API investigation;
+point at health checks / metrics & alerts / inference observability instead.
+
+OPERATIONAL CREDIBILITY
+Fill role_signature_claims with sharp truths for THIS family.
+Fill automation_boundaries and capstone_proof_contract.
+FORBIDDEN absolute automation language:
   "fully automated", "no humans needed", "complete automation", "automated everything"
-REQUIRED framing instead:
-  common-path automation, escalation for unsafe/ambiguous states, human review
-  gates, fail-closed behavior, repair pipeline with explicit boundaries.
+Use common-path automation + escalation + fail-closed + human review gates.
 
-NO FAKE ACCOMPLISHMENT LANGUAGE (critical)
-Project Lambda generates a roadmap, not fake achievements.
-capstone_proof_contract and hiring_manager_readout MUST NOT claim the user
-already achieved results.
-FORBIDDEN unless clearly framed as a future target/template:
-  "I successfully validated", "MTTD was consistently under",
-  "MTTR was maintained below", "I built", "I proved"
-REQUIRED framing:
-  "After completing this capstone, the candidate should be able to say…"
-  "Target measurement…"
-  "Evidence to produce…"
-  "The final readout should include…"
+NO FAKE ACCOMPLISHMENT LANGUAGE
+Capstone readout is future-facing / template language only.
 
-FLUIDSTACK-LIKE PROGRESSION (adapt titles; keep order spirit)
-1. How does software move between machines and still work? (NO Docker)
-   → concrete machine-report project [general]
+GENERAL FOUNDATION (most software/systems roles)
+1. How does software move between machines and still work? (machine-report, NO Docker) [general]
 2. Python automation with config, logs, clear failure modes [general]
 3. Why do services expose APIs? [general]
-4. Why does Docker exist? [general] + Dockerfile (or equivalent) in same repo
+4. Why does Docker exist? [general] + Dockerfile in same repo
 5. Why do production systems need health checks? [general]
 6. Why do metrics and alerts exist? [general]
-7. Why does repair become a state machine? [role_specific]
+Then ROLE-SPECIFIC investigations for the chosen family (NOT always fleet repair).
+
+AI INFRA / MODEL SERVING ROLE-SPECIFIC EXAMPLE (when family matches)
+7. How does an AI model become a service?
+8. Why do inference systems care about latency and throughput?
+9. Why do batching and queues improve throughput but hurt latency?
+10. Capstone: Local Inference Service Reliability Lab
+    (API works, load test, P50/P95/P99, throughput, error rate, metrics,
+     failure injection, postmortem, latency/throughput tradeoff README)
+
+GPU FLEET PRODUCTION ENGINEERING EXAMPLE (only when JD supports it)
+7. Why does repair become a state machine?
 8. How do BMC/Redfish-style interfaces expose hardware state?
-   (or equivalent explicit BMC/Redfish/IPMI investigation) [role_specific]
-9. How would a GPU repair pipeline simulation work? [role_specific]
-10. Capstone verification + incident/postmortem evidence on SAME repo
-    [role_specific] — future-facing proof contract only
+9. How would a GPU repair pipeline simulation work?
+10. Capstone: GPU Fleet Repair / Health Simulation
 
 OUTPUT
 Match the JSON schema exactly.
 Fill guardrail_checks honestly.
-Be concrete, problem-first, cumulative, consistent across sections, and
-hiring-manager credible without fabricating completed results.
+Be concrete, problem-first, family-correct, cumulative, and credible.
 """
 
 
@@ -1272,56 +1356,42 @@ def build_user_prompt(job_description: str, engineer_profile: str) -> str:
     return f"""Generate a Project Lambda Role-to-Roadmap for this engineer.
 
 Hard requirements for THIS run:
-1. Investigation 1 = software portability / environment mismatch via a concrete
-   machine-report project (Python version check, APP_ENV, one dependency,
-   output/report.txt, logging, clear config failure, README, failure log,
-   assumptions table). NO Docker. NO vague "create a simple application."
-2. Docker only later as "Why does Docker exist?" after portability pain. Docker
-   is GENERAL track (not role_specific) unless the JD treats container
-   infrastructure as a primary role-specific duty. If Docker investigation
-   exists, add Dockerfile (or docker-compose / docker docs) to the SAME
-   cumulative repo growth model and proof ladder.
-3. EVERY investigation (including Capstone): Phase 0 mental model (>=300 chars)
-   that literally uses at least two of these exact words: because, depends,
-   layer, failure, assumption, runtime, dependency, environment, signal, state.
-   visual_system_model >=80 chars with boxes/arrows/layers.
-4. role_signature_claims: >=4 sharp engineering truths (not generic summaries).
-5. NEVER say fully automated / no humans needed / complete automation /
-   automated everything. Use common-path automation + escalation + fail-closed.
-6. Fill operational_metrics_contract (include MTTD and MTTR or return-to-service)
-   with source exactly one of: stated_in_jd | implied_by_jd |
-   proposed_project_target. Invented numeric thresholds (e.g. MTTD <5 min,
-   MTTR <30 min) MUST be proposed_project_target — never stated_in_jd.
-   Same honesty for performance_requirements.source.
-7. Fill automation_boundaries (safe / escalate / fail-closed / approval gates).
-8. Fill capstone_proof_contract with failure injections, MTTD/MTTR measurements,
-   verification + postmortem docs, hiring_manager_readout. Readout MUST be
-   future-facing ("After completing…", "Target…", "Evidence to produce…") —
-   NEVER fake past-tense success ("I built", "I proved", "MTTD was under…").
-9. ONE cumulative system; stable same_system_name; one github_repository with a
-   multi-line final_folder_structure tree (>=80 chars showing README/docs/src/
-   Dockerfile/tests/outputs).
-10. ROADMAP CONSISTENCY: repo_growth_model, investigation_roadmap,
-    proof_of_work_ladder, final_folder_structure, and roadmap_tracks MUST agree.
-    Same investigation numbers, titles, and modules. Growth count = ladder
-    count = investigation count. Every growth folder appears in roadmap/ladder.
-    module_or_folder_added must be a SPECIFIC path identical across roadmap,
-    growth, and ladder (e.g. src/machine_report.py) — NEVER vague 'src/' alone.
-11. Capstone LAST with real proof beyond prior integration. The FINAL
-    investigation title should include Capstone/verification/postmortem language.
-    A mid/late 'GPU repair pipeline simulation' investigation may exist BEFORE
-    the final Capstone, but only the LAST item gets a real capstone_delta.
-    Final capstone_delta MUST literally mention: failure injection, MTTD, MTTR
-    (or return-to-service), and postmortem/verification. Non-final use
-    'n/a — not the capstone'.
-12. first_investigation_prompt paste-ready with Phase 0 / mental model / observe /
-    build / break / improve / GitHub / Obsidian / commands / exit criteria;
-    names machine-report; no Docker.
-13. If the JD mentions Redfish, BMC, IPMI, or firmware-level telemetry, include
-    an explicit role_specific investigation or subquestion naming that concept
-    (do not collapse to only "hardware telemetry").
-14. Track discipline: general investigations appear in general_engineering_track;
-    role_specific ones appear in role_specific_track.
+0. FIRST fill role_family. Classify from the JD. Do NOT default to
+   gpu_fleet_production_engineering just because GPUs appear. Model serving /
+   inference / latency / throughput JDs → ai_infrastructure_model_serving.
+   Repair/RMA/BMC/Redfish/fleet hardware JDs → gpu_fleet_production_engineering.
+1. Investigation 1 = software portability via concrete machine-report
+   (Python version, APP_ENV, one dependency, output/report.txt, logging,
+   clear config failure, README, failure log, assumptions table). NO Docker.
+2. Docker later as "Why does Docker exist?" on GENERAL track (+ Dockerfile in
+   same repo) unless JD makes containers a primary role-specific duty.
+3. Role-specific investigations MUST match role_family. For
+   ai_infrastructure_model_serving: model serving / inference latency /
+   throughput / batching / queues / observability / load testing — NOT
+   BMC/Redfish/GPU repair unless JD explicitly mentions those.
+4. Cumulative system name MUST match family (inference/model-serving lab vs
+   fleet-repair lab). Capstone shape MUST match family.
+5. EVERY investigation: Phase 0 mental model (>=300 chars) with >=2 of:
+   because, depends, layer, failure, assumption, runtime, dependency,
+   environment, signal, state. visual_system_model >=80 chars.
+6. role_signature_claims: >=4 sharp truths for THIS family.
+7. NEVER say fully automated / no humans needed / complete automation /
+   automated everything.
+8. operational_metrics_contract: honest source labels; proposed metrics must be
+   project-measurable (latency/throughput/error rate/queue depth/MTTD/MTTR…).
+   No user-satisfaction/revenue/six-month business KPIs as proposed metrics.
+9. automation_boundaries + future-facing capstone_proof_contract.
+10. ROADMAP CONSISTENCY: growth/ladder/investigations same count, titles, modules.
+    roadmap_tracks titles are SHORT and EXACT copies of investigation titles
+    (general↔general, role_specific↔role_specific). No extras, no paragraphs.
+11. proof_of_work_ladder[i].title == investigation_roadmap[i].title AND
+    connected_investigations includes that same title.
+12. missing_mental_models[].first_investigation_that_builds_it must point at an
+    investigation that actually builds it (observability ≠ API investigation).
+13. If JD mentions Redfish/BMC/IPMI/firmware telemetry/repair/RMA/fleet hardware,
+    include explicit coverage. If not, do NOT invent it.
+14. Capstone LAST with family-correct proof. Final capstone_delta mentions
+    failure injection + measurements + postmortem/verification.
 15. Fill guardrail_checks honestly.
 
 === JOB DESCRIPTION ===

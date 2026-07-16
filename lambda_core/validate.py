@@ -60,6 +60,12 @@ VISUAL_SIGNS = (
     "stage",
     "boxes",
     "arrow",
+    "host",
+    "image",
+    "container",
+    "component",
+    "gateway",
+    "queue",
 )
 
 GENERIC_PAIN_PHRASES = (
@@ -122,6 +128,183 @@ ROLE_SHAPED_SYSTEM_WORDS = (
     "health",
     "infrastructure",
     "telemetry",
+    "inference",
+    "serving",
+    "model",
+    "latency",
+    "platform",
+    "reliability",
+)
+
+ALLOWED_ROLE_FAMILIES = (
+    "ai_infrastructure_model_serving",
+    "gpu_fleet_production_engineering",
+    "backend_platform_engineering",
+    "robotics_systems",
+    "embedded_ai",
+    "cloud_infrastructure",
+    "controls_automation_software",
+    "data_center_compute_infrastructure",
+    "general_systems_software",
+)
+
+# JD must support these before BMC/Redfish/IPMI investigations are allowed.
+JD_HARDWARE_TOOLING_SIGNALS = (
+    "redfish",
+    "bmc",
+    "ipmi",
+    "firmware-level",
+    "firmware level",
+    "firmware telemetry",
+    "bare metal",
+    "hardware lifecycle",
+    "hardware qualification",
+    "physical repair",
+    "physical fleet",
+    "rma",
+    "repair pipeline",
+    "parts management",
+)
+
+# JD must support these before GPU repair pipeline simulation is allowed.
+JD_REPAIR_PIPELINE_SIGNALS = (
+    "repair pipeline",
+    "repair",
+    "rma",
+    "return to service",
+    "return-to-service",
+    "fleet health",
+    "hardware failure",
+    "bare metal repair",
+    "physical repair",
+    "gpu failure",
+    "triage",
+    "parts management",
+    "fault detection",
+)
+
+FLEET_REPAIR_OUTPUT_TERMS = (
+    "bmc",
+    "redfish",
+    "ipmi",
+    "gpu repair pipeline",
+    "repair pipeline simulation",
+    "hardware fleet repair",
+    "repair state machine",
+    "fleet repair",
+)
+
+MODEL_SERVING_ROLE_TERMS = (
+    "model serving",
+    "inference",
+    "latency",
+    "throughput",
+    "batching",
+    "queue",
+    "p50",
+    "p95",
+    "p99",
+    "load test",
+    "cold start",
+    "token",
+    "vllm",
+    "triton",
+)
+
+MODEL_SERVING_SYSTEM_TERMS = (
+    "inference",
+    "serving",
+    "model-serving",
+    "model_serving",
+    "ai-inference",
+    "ai_inference",
+    "reliability",
+)
+
+FLEET_SYSTEM_TERMS = (
+    "fleet",
+    "repair",
+    "compute-fleet",
+    "gpu-fleet",
+)
+
+UNMEASURABLE_PROPOSED_METRIC_PHRASES = (
+    "user satisfaction",
+    "customer satisfaction",
+    "revenue",
+    "nps",
+    "business kpi",
+    "business outcome",
+    "six-month",
+    "6 month",
+    "6-month",
+    "first 6 months",
+    "within the first 6 months",
+    "org target",
+    "stakeholder happiness",
+)
+
+PROJECT_MEASURABLE_METRIC_TERMS = (
+    "latency",
+    "p50",
+    "p95",
+    "p99",
+    "throughput",
+    "requests/sec",
+    "req/s",
+    "request count",
+    "error rate",
+    "queue depth",
+    "batch size",
+    "gpu utilization",
+    "cpu",
+    "memory",
+    "cold start",
+    "mttd",
+    "mttr",
+    "return to service",
+    "return-to-service",
+    "false positive",
+    "false negative",
+    "telemetry freshness",
+    "escalation rate",
+    "alert noise",
+    "pass rate",
+    "health check",
+    "successful health",
+    "qualification",
+    "first attempt",
+    "accurate",
+    "actionable",
+    "fleet health",
+    "repair queue",
+    "incident response",
+    "manual intervention",
+    "visibility",
+    "trigger",
+    "resolution time",
+    "incident resolution",
+    "repair workflow",
+    "successfully executed",
+    "automated repair",
+    "workflows successfully",
+)
+
+OBSERVABILITY_MENTAL_MODEL_TERMS = (
+    "observability",
+    "metrics",
+    "alerting",
+    "alert",
+    "health check",
+    "monitoring",
+    "telemetry",
+)
+
+API_INVESTIGATION_MARKERS = (
+    "expose api",
+    "expose apis",
+    "services expose",
+    "why do services expose",
 )
 
 ROLE_SPECIFIC_ONLY_TERMS = (
@@ -495,6 +678,61 @@ def _number_token_in_jd(token: str, jd: str) -> bool:
 def _jd_has_container_primary_duty(jd: str) -> bool:
     jd_l = _lower(jd)
     return any(re.search(p, jd_l) for p in CONTAINER_PRIMARY_DUTY_PATTERNS)
+
+
+def _jd_supports_hardware_tooling(jd: str) -> bool:
+    return bool(_contains_any(jd, JD_HARDWARE_TOOLING_SIGNALS))
+
+
+def _jd_supports_repair_pipeline(jd: str) -> bool:
+    return bool(_contains_any(jd, JD_REPAIR_PIPELINE_SIGNALS))
+
+
+def _infer_family_from_jd(jd: str) -> str | None:
+    """Best-effort family hint from JD text for cross-checks."""
+    if not jd.strip():
+        return None
+    jd_l = _lower(jd)
+    if _jd_supports_hardware_tooling(jd) or (
+        _jd_supports_repair_pipeline(jd)
+        and any(t in jd_l for t in ("fleet", "bare metal", "gpu failure", "rma"))
+    ):
+        return "gpu_fleet_production_engineering"
+    if any(
+        t in jd_l
+        for t in (
+            "model serving",
+            "inference",
+            "vllm",
+            "triton",
+            "token throughput",
+            "cold start",
+            "latency budget",
+            "$/token",
+            "p95 inference",
+        )
+    ):
+        return "ai_infrastructure_model_serving"
+    return None
+
+
+def _titles_exact(a: str, b: str) -> bool:
+    return _norm_title(a) == _norm_title(b) and bool(_norm_title(a))
+
+
+def _is_paragraph_track_item(text: str) -> bool:
+    t = (text or "").strip()
+    if len(t) > 120:
+        return True
+    if t.count(".") >= 2:
+        return True
+    if "\n" in t:
+        return True
+    return False
+
+
+def _track_titles_exact_set(entries: list[Any]) -> list[str]:
+    return [str(e).strip() for e in entries if str(e).strip()]
 
 
 def _has_future_framing(text: str) -> bool:
@@ -1302,17 +1540,16 @@ def validate_roadmap(
         str(inv.get("title") or "") for inv in investigations if isinstance(inv, dict)
     ]
 
+    sorted_growth: list[dict[str, Any]] = sorted(
+        growth_list,
+        key=lambda g: int(g.get("investigation_number") or 0),
+    )
     if growth_list and len(growth_list) != n:
         failures.append(
             f"repo_growth_model count ({len(growth_list)}) must match "
             f"investigation_roadmap count ({n})."
         )
-    else:
-        # Sort by investigation_number when present
-        sorted_growth = sorted(
-            growth_list,
-            key=lambda g: int(g.get("investigation_number") or 0),
-        )
+    elif growth_list:
         for i, inv in enumerate(investigations):
             if not isinstance(inv, dict):
                 continue
@@ -1386,6 +1623,23 @@ def validate_roadmap(
                         f"roadmap '{inv.get('module_or_folder_added')}' vs ladder "
                         f"'{lv.get('module_or_folder_added')}'."
                     )
+                inv_title = str(inv.get("title") or "").strip()
+                lv_title = str(lv.get("title") or "").strip()
+                if inv_title and lv_title and not _titles_exact(inv_title, lv_title):
+                    failures.append(
+                        f"proof_of_work_ladder[{i}] title '{lv_title}' must exactly equal "
+                        f"investigation_roadmap[{i}] title '{inv_title}'."
+                    )
+                connected = [
+                    str(c).strip()
+                    for c in (lv.get("connected_investigations") or [])
+                    if str(c).strip()
+                ]
+                if inv_title and not any(_titles_exact(inv_title, c) for c in connected):
+                    failures.append(
+                        f"proof_of_work_ladder[{i}].connected_investigations must include "
+                        f"its own investigation title '{inv_title}'."
+                    )
                 # Growth and ladder must agree even when investigation is vague
                 if i < len(sorted_growth):
                     g_mod = str(sorted_growth[i].get("folder_or_module_added") or "")
@@ -1440,7 +1694,7 @@ def validate_roadmap(
                     f"repo_growth_model (e.g. {', '.join(missing_in_tree[:4])})."
                 )
 
-    # 22. Track label discipline vs roadmap_tracks lists
+    # 22. Track titles must EXACTLY match investigation titles (short titles only)
     general_invs = [
         inv for inv in investigations
         if isinstance(inv, dict) and str(inv.get("track", "")).lower() == "general"
@@ -1449,18 +1703,64 @@ def validate_roadmap(
         inv for inv in investigations
         if isinstance(inv, dict) and str(inv.get("track", "")).lower() == "role_specific"
     ]
-    for inv in general_invs:
-        if not any(_track_entry_matches_investigation(str(e), inv) for e in general_track):
+    general_titles = [str(inv.get("title") or "").strip() for inv in general_invs]
+    role_titles = [str(inv.get("title") or "").strip() for inv in role_invs]
+    general_track_titles = _track_titles_exact_set(general_track)
+    role_track_titles = _track_titles_exact_set(role_track)
+
+    for entry in general_track_titles + role_track_titles:
+        if _is_paragraph_track_item(entry):
             failures.append(
-                f"Investigation '{inv.get('title', '')}' is labeled general but does "
-                "not appear in roadmap_tracks.general_engineering_track."
+                f"roadmap_tracks item is paragraph-length / not a short title: '{entry[:80]}…'"
+                if len(entry) > 80
+                else f"roadmap_tracks item is paragraph-length / not a short title: '{entry}'"
             )
-    for inv in role_invs:
-        if not any(_track_entry_matches_investigation(str(e), inv) for e in role_track):
+
+    def _title_in(titles: list[str], candidate: str) -> bool:
+        return any(_titles_exact(candidate, t) for t in titles)
+
+    for entry in general_track_titles:
+        if not _title_in(general_titles, entry):
             failures.append(
-                f"Investigation '{inv.get('title', '')}' is labeled role_specific but "
-                "does not appear in roadmap_tracks.role_specific_track."
+                f"roadmap_tracks.general_engineering_track title '{entry}' does not "
+                "exactly match any investigation with track=general."
             )
+    for entry in role_track_titles:
+        if not _title_in(role_titles, entry):
+            failures.append(
+                f"roadmap_tracks.role_specific_track title '{entry}' does not "
+                "exactly match any investigation with track=role_specific."
+            )
+    for title in general_titles:
+        if not _title_in(general_track_titles, title):
+            failures.append(
+                f"Investigation '{title}' (general) missing from "
+                "roadmap_tracks.general_engineering_track."
+            )
+        if _title_in(role_track_titles, title):
+            failures.append(
+                f"Investigation '{title}' appears in both general and role_specific tracks."
+            )
+    for title in role_titles:
+        if not _title_in(role_track_titles, title):
+            failures.append(
+                f"Investigation '{title}' (role_specific) missing from "
+                "roadmap_tracks.role_specific_track."
+            )
+        if _title_in(general_track_titles, title):
+            failures.append(
+                f"Investigation '{title}' appears in both general and role_specific tracks."
+            )
+    if len(general_track_titles) != len(general_titles):
+        failures.append(
+            "roadmap_tracks.general_engineering_track count must equal number of "
+            f"general investigations ({len(general_titles)} vs {len(general_track_titles)})."
+        )
+    if len(role_track_titles) != len(role_titles):
+        failures.append(
+            "roadmap_tracks.role_specific_track count must equal number of "
+            f"role_specific investigations ({len(role_titles)} vs {len(role_track_titles)})."
+        )
 
     # Docker cannot be role-specific unless JD treats containers as primary duty
     docker_role_specific = False
@@ -1552,38 +1852,57 @@ def validate_roadmap(
         source_raw = str(item.get("source") or "")
         _check_sourced_item(f"performance_requirements[{i}]", req_text, source_raw)
 
-    # 24. JD hardware tooling must appear explicitly in role-specific roadmap
+    # 24. Hardware tooling / repair leakage vs JD support
+    role_output_blob = _lower(
+        " ".join(
+            [_join_fields(inv, ("title", "engineering_question", "expensive_problem",
+                                "phase_0_mental_model", "subquestions",
+                                "concepts_and_vocabulary", "build_or_modify"))
+             for inv in role_invs]
+            + [str(e) for e in role_track]
+            + [
+                str((data.get("cumulative_system") or {}).get("system_name") or ""),
+                str((data.get("cumulative_system") or {}).get("final_capstone_shape") or ""),
+                str(final.get("title") or ""),
+                str(final.get("capstone_delta") or ""),
+            ]
+        )
+    )
     if jd_text:
         jd_tooling = _contains_any(jd_text, HARDWARE_TOOLING_TERMS)
         if jd_tooling:
-            role_blob_parts: list[str] = []
-            for inv in role_invs:
-                role_blob_parts.append(
-                    _join_fields(
-                        inv,
-                        (
-                            "title",
-                            "engineering_question",
-                            "expensive_problem",
-                            "phase_0_mental_model",
-                            "subquestions",
-                            "concepts_and_vocabulary",
-                            "build_or_modify",
-                        ),
-                    )
-                )
-            for entry in role_track:
-                role_blob_parts.append(str(entry))
-            role_blob = _lower(" ".join(role_blob_parts))
-            missing_tools = [t for t in jd_tooling if t not in role_blob]
-            # If JD has redfish/bmc/ipmi, at least one must appear explicitly
-            if missing_tools == list(jd_tooling):
+            if not any(t in role_output_blob for t in jd_tooling):
                 failures.append(
                     "JD mentions "
                     + ", ".join(sorted(set(jd_tooling)))
                     + " but the role-specific roadmap never names those concepts "
                     "explicitly (do not collapse into only generic 'hardware telemetry')."
                 )
+        else:
+            leaked = [t for t in HARDWARE_TOOLING_TERMS if t in role_output_blob]
+            # also scan all investigations/tracks for BMC/Redfish invention
+            all_blob = role_output_blob + " " + _lower(
+                " ".join(str(e) for e in general_track)
+            )
+            leaked = [t for t in HARDWARE_TOOLING_TERMS if t in all_blob]
+            if leaked and not _jd_supports_hardware_tooling(jd_text):
+                failures.append(
+                    "Roadmap invents BMC/Redfish/IPMI concepts but the JD does not "
+                    "mention hardware fleet tooling / firmware telemetry / bare metal "
+                    f"lifecycle ({', '.join(sorted(set(leaked)))})."
+                )
+
+        repair_hits = _contains_any(role_output_blob, (
+            "gpu repair pipeline",
+            "repair pipeline simulation",
+            "fleet repair",
+        ))
+        if repair_hits and not _jd_supports_repair_pipeline(jd_text):
+            failures.append(
+                "Roadmap includes GPU/fleet repair pipeline simulation but the JD does "
+                "not support repair/RMA/return-to-service/fleet-health operations "
+                f"({', '.join(sorted(set(repair_hits)))})."
+            )
 
     # 25. Capstone must not use fake past-tense achievement language
     if isinstance(proof, dict):
@@ -1599,7 +1918,6 @@ def validate_roadmap(
                 "Use 'After completing…', 'Target measurement…', or "
                 "'Evidence to produce…'."
             )
-        # Stronger: readout specifically
         readout_fakes = _fake_achievement_hits(readout)
         if readout_fakes and not _has_future_framing(readout):
             failures.append(
@@ -1607,6 +1925,175 @@ def validate_roadmap(
                 f"results ({', '.join(sorted(set(readout_fakes)))}). Project Lambda "
                 "generates a roadmap, not fake achievements."
             )
+
+    # 26. Role family classification + family-correct routing
+    role_family = data.get("role_family")
+    primary_family = ""
+    if not isinstance(role_family, dict):
+        failures.append("role_family is missing.")
+    else:
+        primary_family = str(role_family.get("primary_family") or "").strip()
+        if primary_family not in ALLOWED_ROLE_FAMILIES:
+            failures.append(
+                f"role_family.primary_family '{primary_family}' is not an allowed family."
+            )
+        why = str(role_family.get("why_this_family") or "").strip()
+        if len(why) < 40:
+            failures.append("role_family.why_this_family is missing or too thin.")
+        excluded = role_family.get("excluded_families")
+        if not isinstance(excluded, list):
+            failures.append("role_family.excluded_families must be a list.")
+
+        inferred = _infer_family_from_jd(jd_text) if jd_text else None
+        if (
+            inferred == "ai_infrastructure_model_serving"
+            and primary_family == "gpu_fleet_production_engineering"
+            and not _jd_supports_repair_pipeline(jd_text)
+        ):
+            failures.append(
+                "role_family.primary_family is gpu_fleet_production_engineering but the "
+                "JD reads as AI infrastructure / model serving without fleet-repair support."
+            )
+        if (
+            inferred == "gpu_fleet_production_engineering"
+            and primary_family == "ai_infrastructure_model_serving"
+            and _jd_supports_hardware_tooling(jd_text)
+        ):
+            # Soft: Fluidstack-like JDs should not be classified as model serving
+            failures.append(
+                "role_family.primary_family is ai_infrastructure_model_serving but the "
+                "JD strongly indicates GPU fleet production engineering "
+                "(repair/BMC/Redfish/hardware lifecycle)."
+            )
+
+        system_blob = _lower(
+            str((cumulative or {}).get("system_name") or "")
+            + " "
+            + str((cumulative or {}).get("suggested_repo_name") or "")
+            + " "
+            + str((cumulative or {}).get("final_capstone_shape") or "")
+        )
+        if primary_family == "ai_infrastructure_model_serving":
+            if not any(t in system_blob for t in MODEL_SERVING_SYSTEM_TERMS):
+                failures.append(
+                    "ai_infrastructure_model_serving cumulative system should be named "
+                    "like ai-inference-reliability-lab / model-serving-ops-lab / "
+                    "inference-platform-lab (inference/serving/model reliability)."
+                )
+            if any(t in system_blob for t in ("fleet-repair", "repair-lab", "gpu-fleet-ops")):
+                failures.append(
+                    "ai_infrastructure_model_serving must not use a fleet-repair "
+                    "cumulative system name."
+                )
+            role_titles_blob = _lower(" ".join(role_titles + [str(final.get("title") or "")]))
+            if not _contains_any(role_titles_blob, MODEL_SERVING_ROLE_TERMS):
+                failures.append(
+                    "ai_infrastructure_model_serving role-specific investigations must "
+                    "include model serving / inference / latency / throughput style work."
+                )
+            capstone_blob = _lower(
+                str(final.get("title") or "")
+                + " "
+                + str(final.get("capstone_delta") or "")
+                + " "
+                + str((cumulative or {}).get("final_capstone_shape") or "")
+                + " "
+                + (
+                    " ".join(str(x) for x in (proof.get("what_it_must_demonstrate") or []))
+                    if isinstance(proof, dict)
+                    else ""
+                )
+            )
+            if not _contains_any(
+                capstone_blob,
+                ("inference", "serving", "latency", "throughput", "load test", "p95", "p99"),
+            ):
+                failures.append(
+                    "ai_infrastructure_model_serving capstone must prove inference/"
+                    "model-serving reliability (latency/throughput/load/error metrics), "
+                    "not fleet repair."
+                )
+            if _contains_any(
+                capstone_blob,
+                ("gpu repair pipeline", "fleet repair", "return-to-service repair"),
+            ) and not _jd_supports_repair_pipeline(jd_text or ""):
+                failures.append(
+                    "ai_infrastructure_model_serving capstone must not be a GPU fleet "
+                    "repair simulation when the JD does not support fleet repair."
+                )
+            # Reject fleet-repair leakage in role-specific track for this family
+            leaked_fleet = _contains_any(role_output_blob, FLEET_REPAIR_OUTPUT_TERMS)
+            if leaked_fleet and jd_text and not _jd_supports_repair_pipeline(jd_text):
+                failures.append(
+                    "ai_infrastructure_model_serving roadmap leaks fleet-repair topics "
+                    f"without JD support: {', '.join(sorted(set(leaked_fleet)))}."
+                )
+
+        if primary_family == "gpu_fleet_production_engineering":
+            if not any(t in system_blob for t in FLEET_SYSTEM_TERMS + ("health", "compute", "gpu")):
+                failures.append(
+                    "gpu_fleet_production_engineering cumulative system should be "
+                    "role-shaped (fleet/repair/compute/gpu health)."
+                )
+
+    # 27. Proposed metrics must be project-measurable
+    for i, item in enumerate(metrics if isinstance(metrics, list) else [], start=1):
+        if not isinstance(item, dict):
+            continue
+        source_c = _normalize_metric_source(str(item.get("source") or ""))
+        metric_text = " ".join(
+            [
+                str(item.get("metric") or ""),
+                str(item.get("how_to_measure_in_the_project") or ""),
+            ]
+        )
+        low_m = _lower(metric_text)
+        if source_c == "proposed_project_target":
+            bad = [p for p in UNMEASURABLE_PROPOSED_METRIC_PHRASES if p in low_m]
+            if bad:
+                failures.append(
+                    f"operational_metrics_contract[{i}] proposed metric looks like a "
+                    f"business/org KPI not measurable in the project ({', '.join(bad)})."
+                )
+            elif not _contains_any(low_m, PROJECT_MEASURABLE_METRIC_TERMS):
+                failures.append(
+                    f"operational_metrics_contract[{i}] ('{item.get('metric', '')}') "
+                    "is not clearly measurable by the cumulative project "
+                    "(prefer latency/throughput/error rate/queue/MTTD/MTTR/etc.)."
+                )
+
+    # 28. missing_mental_models must point at investigations that build them
+    inv_title_list = [str(inv.get("title") or "").strip() for inv in investigations]
+    for i, mm in enumerate(data.get("missing_mental_models") or [], start=1):
+        if not isinstance(mm, dict):
+            continue
+        pointer = str(mm.get("first_investigation_that_builds_it") or "").strip()
+        model = str(mm.get("mental_model") or "").strip()
+        if not pointer:
+            failures.append(
+                f"missing_mental_models[{i}] missing first_investigation_that_builds_it."
+            )
+            continue
+        if inv_title_list and not any(
+            _titles_exact(pointer, t) or _titles_align(pointer, t) for t in inv_title_list
+        ):
+            failures.append(
+                f"missing_mental_models[{i}] first_investigation_that_builds_it "
+                f"'{pointer}' does not match any investigation title."
+            )
+            continue
+        model_l = _lower(model)
+        pointer_l = _lower(pointer)
+        if any(t in model_l for t in OBSERVABILITY_MENTAL_MODEL_TERMS):
+            if any(m in pointer_l for m in API_INVESTIGATION_MARKERS) and not any(
+                t in pointer_l
+                for t in ("health", "metric", "alert", "observ", "latency", "monitor")
+            ):
+                failures.append(
+                    f"missing_mental_models[{i}] observability/metrics model incorrectly "
+                    f"points at API investigation '{pointer}'. Point at health checks, "
+                    "metrics/alerts, or inference observability instead."
+                )
 
     if failures:
         bullet = "\n".join(f"- {f}" for f in failures)

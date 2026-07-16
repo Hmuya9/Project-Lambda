@@ -20,10 +20,8 @@ def _latest_roadmap_json() -> Path | None:
     return candidates[-1] if candidates else None
 
 
-FLUIDSTACK_ROADMAP = _latest_roadmap_json() or (
-    ROOT / "outputs" / "roadmap_20260715_175853.json"
-)
 FLUIDSTACK_JD = ROOT / "examples" / "jobs" / "fluidstack_production_engineering.md"
+AI_INFRA_JD = ROOT / "examples" / "jobs" / "ai_infra_systems.md"
 
 
 def _minimal_good_roadmap() -> dict:
@@ -229,6 +227,15 @@ Engineering page: Software Portability — assumptions table and failure modes.
     ]
 
     return {
+        "role_family": {
+            "primary_family": "gpu_fleet_production_engineering",
+            "secondary_families": ["data_center_compute_infrastructure"],
+            "why_this_family": (
+                "JD owns GPU fleet repair pipelines, return-to-service, and "
+                "BMC/Redfish hardware telemetry."
+            ),
+            "excluded_families": ["ai_infrastructure_model_serving"],
+        },
         "role_interpretation": {
             "one_liner": "Fleet repair ops engineer",
             "real_mission": "Turn GPU failure into a measured repair pipeline.",
@@ -264,7 +271,14 @@ Engineering page: Software Portability — assumptions table and failure modes.
             "misleading_overclaims_to_avoid": [],
             "strongest_positioning_angle": "x",
         },
-        "missing_mental_models": [],
+        "missing_mental_models": [
+            {
+                "mental_model": "Observability and alerting for production health",
+                "why_required_before_role_work": "Need signal discipline before repair automation.",
+                "what_goes_wrong_without_it": "Blind repair loops and noisy pages.",
+                "first_investigation_that_builds_it": inv_health["title"],
+            }
+        ],
         "general_engineering_value_threshold": [
             {
                 "capability": "Linux/server fluency",
@@ -277,17 +291,16 @@ Engineering page: Software Portability — assumptions table and failure modes.
         "skill_dependency_graph": [],
         "roadmap_tracks": {
             "general_engineering_track": [
-                "software portability / machine-report",
-                "APIs",
-                "Why Docker exists",
-                "health checks",
+                inv_portability["title"],
+                inv_api["title"],
+                inv_docker["title"],
+                inv_health["title"],
             ],
             "role_specific_track": [
-                "GPU repair pipeline simulation capstone",
-                "repair state machine",
-                "BMC/Redfish telemetry",
+                inv_capstone["title"],
             ],
         },
+
         "cumulative_system": {
             "system_name": "fleet-repair-lab",
             "system_purpose": "Grow one fleet repair simulation system.",
@@ -546,13 +559,16 @@ def test_growth_module_mismatch_fails():
 
 def test_docker_role_specific_fails():
     data = _minimal_good_roadmap()
+    docker_title = data["investigation_roadmap"][2]["title"]
     data["investigation_roadmap"][2]["track"] = "role_specific"
-    data["roadmap_tracks"]["role_specific_track"].append("Why Docker exists")
-    # remove from general track matching
     data["roadmap_tracks"]["general_engineering_track"] = [
         e
         for e in data["roadmap_tracks"]["general_engineering_track"]
         if "docker" not in e.lower()
+    ]
+    data["roadmap_tracks"]["role_specific_track"] = [
+        docker_title,
+        data["investigation_roadmap"][4]["title"],
     ]
     with pytest.raises(ValidationError) as exc:
         validate_roadmap(data, job_description="Own GPU fleet health and repair pipelines.")
@@ -603,12 +619,27 @@ def test_vague_investigation_1_fails():
 
 def test_redfish_required_when_in_jd():
     data = _minimal_good_roadmap()
-    # Ensure no BMC/Redfish/IPMI in role-specific content
-    data["roadmap_tracks"]["role_specific_track"] = [
-        "GPU repair pipeline simulation capstone",
-        "repair state machine",
-        "hardware telemetry",
-    ]
+    # Keep exact track match but strip BMC/Redfish from all role content
+    for inv in data["investigation_roadmap"]:
+        for key in ("title", "engineering_question", "expensive_problem", "phase_0_mental_model",
+                    "build_or_modify"):
+            inv[key] = (
+                str(inv.get(key) or "")
+                .replace("BMC", "hardware")
+                .replace("Redfish", "telemetry")
+                .replace("IPMI", "bus")
+            )
+        inv["subquestions"] = ["q1", "q2", "q3"]
+        inv["concepts_and_vocabulary"] = ["runtime", "dependency", "env var"]
+    # Rebuild exact tracks after title edits
+    generals = [i for i in data["investigation_roadmap"] if i["track"] == "general"]
+    roles = [i for i in data["investigation_roadmap"] if i["track"] == "role_specific"]
+    data["roadmap_tracks"]["general_engineering_track"] = [i["title"] for i in generals]
+    data["roadmap_tracks"]["role_specific_track"] = [i["title"] for i in roles]
+    for i, inv in enumerate(data["investigation_roadmap"]):
+        data["proof_of_work_ladder"][i]["title"] = inv["title"]
+        data["proof_of_work_ladder"][i]["connected_investigations"] = [inv["title"]]
+        data["cumulative_system"]["repo_growth_model"][i]["investigation_title"] = inv["title"]
     jd = FLUIDSTACK_JD.read_text(encoding="utf-8") if FLUIDSTACK_JD.exists() else (
         "Own Redfish and BMC tooling. Firmware-level telemetry and IPMI."
     )
@@ -617,11 +648,221 @@ def test_redfish_required_when_in_jd():
     assert "redfish" in str(exc.value).lower() or "bmc" in str(exc.value).lower()
 
 
-@pytest.mark.skipif(
-    not FLUIDSTACK_ROADMAP.exists(),
-    reason="Fluidstack generated roadmap JSON not present",
-)
-def test_fluidstack_generated_roadmap_passes():
-    data = json.loads(FLUIDSTACK_ROADMAP.read_text(encoding="utf-8"))
-    jd = FLUIDSTACK_JD.read_text(encoding="utf-8") if FLUIDSTACK_JD.exists() else None
+def test_track_titles_must_exactly_match_investigations():
+    data = _minimal_good_roadmap()
+    data["roadmap_tracks"]["role_specific_track"] = [
+        "How do BMC/Redfish-style interfaces expose hardware state?"
+    ]
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "exactly match" in str(exc.value).lower() or "missing from" in str(exc.value).lower()
+
+
+def test_paragraph_track_item_fails():
+    data = _minimal_good_roadmap()
+    data["roadmap_tracks"]["general_engineering_track"][0] = (
+        "How does software move between machines and still work? This investigation "
+        "covers runtime assumptions, dependencies, configuration, and filesystem "
+        "portability across developer and production hosts in depth."
+    )
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "paragraph" in str(exc.value).lower()
+
+
+def test_proof_ladder_connected_must_include_own_title():
+    data = _minimal_good_roadmap()
+    data["proof_of_work_ladder"][0]["connected_investigations"] = [
+        data["investigation_roadmap"][1]["title"]
+    ]
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "connected_investigations" in str(exc.value).lower()
+
+
+def test_proof_ladder_title_must_match_investigation():
+    data = _minimal_good_roadmap()
+    data["proof_of_work_ladder"][1]["title"] = "Some other title entirely"
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "must exactly equal" in str(exc.value).lower()
+
+
+def test_ai_infra_jd_rejects_bmc_redfish_leakage():
+    data = _minimal_good_roadmap()
+    data["role_family"] = {
+        "primary_family": "ai_infrastructure_model_serving",
+        "secondary_families": [],
+        "why_this_family": (
+            "JD owns model serving, inference latency, throughput, and observability "
+            "for LLM workloads — not hardware fleet repair."
+        ),
+        "excluded_families": ["gpu_fleet_production_engineering"],
+    }
+    data["cumulative_system"]["system_name"] = "ai-inference-reliability-lab"
+    data["cumulative_system"]["suggested_repo_name"] = "ai-inference-reliability-lab"
+    data["cumulative_system"]["final_capstone_shape"] = (
+        "Local inference service reliability lab with latency/throughput evidence."
+    )
+    for level in data["proof_of_work_ladder"]:
+        level["same_system_name"] = "ai-inference-reliability-lab"
+    # Inject BMC leakage into role-specific track/investigation
+    data["investigation_roadmap"][4]["title"] = (
+        "How do BMC/Redfish-style interfaces expose hardware state?"
+    )
+    data["investigation_roadmap"][4]["track"] = "role_specific"
+    data["roadmap_tracks"]["role_specific_track"] = [
+        data["investigation_roadmap"][4]["title"]
+    ]
+    data["proof_of_work_ladder"][4]["title"] = data["investigation_roadmap"][4]["title"]
+    data["proof_of_work_ladder"][4]["connected_investigations"] = [
+        data["investigation_roadmap"][4]["title"]
+    ]
+    data["cumulative_system"]["repo_growth_model"][4]["investigation_title"] = (
+        data["investigation_roadmap"][4]["title"]
+    )
+    jd = AI_INFRA_JD.read_text(encoding="utf-8")
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data, job_description=jd)
+    msg = str(exc.value).lower()
+    assert "bmc" in msg or "redfish" in msg or "repair" in msg
+
+
+def test_ai_infra_family_requires_serving_style_work():
+    data = _minimal_good_roadmap()
+    data["role_family"] = {
+        "primary_family": "ai_infrastructure_model_serving",
+        "secondary_families": [],
+        "why_this_family": (
+            "JD focuses on model serving paths, inference latency budgets, and "
+            "token throughput observability."
+        ),
+        "excluded_families": ["gpu_fleet_production_engineering"],
+    }
+    data["cumulative_system"]["system_name"] = "fleet-repair-lab"
+    data["cumulative_system"]["suggested_repo_name"] = "fleet-repair-lab"
+    for level in data["proof_of_work_ladder"]:
+        level["same_system_name"] = "fleet-repair-lab"
+    jd = AI_INFRA_JD.read_text(encoding="utf-8")
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data, job_description=jd)
+    msg = str(exc.value).lower()
+    assert "inference" in msg or "serving" in msg or "fleet-repair" in msg
+
+
+def test_unmeasurable_proposed_metric_fails():
+    data = _minimal_good_roadmap()
+    data["operational_metrics_contract"][2] = {
+        "metric": "User satisfaction rating after six months",
+        "source": "proposed_project_target",
+        "why_it_matters": "Business likes happy users.",
+        "how_to_measure_in_the_project": "Survey users for satisfaction.",
+        "what_bad_result_means": "Unhappy users.",
+    }
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "business" in str(exc.value).lower() or "measurable" in str(exc.value).lower()
+
+
+def test_observability_mm_cannot_point_at_api_investigation():
+    data = _minimal_good_roadmap()
+    data["missing_mental_models"][0]["first_investigation_that_builds_it"] = (
+        "Why do services expose APIs?"
+    )
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "observability" in str(exc.value).lower() or "api" in str(exc.value).lower()
+
+
+def _latest_json_for_job(job_stem: str) -> Path | None:
+    outputs = ROOT / "outputs"
+    if not outputs.is_dir():
+        return None
+    # Prefer JSON whose markdown sibling mentions the job path
+    candidates = sorted(outputs.glob("roadmap_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for path in candidates:
+        md = path.with_suffix(".md")
+        if md.exists() and job_stem in md.read_text(encoding="utf-8", errors="ignore"):
+            return path
+    return candidates[0] if candidates else None
+
+
+@pytest.mark.skipif(not FLUIDSTACK_JD.exists(), reason="Fluidstack JD missing")
+def test_fluidstack_jd_allows_fleet_repair_family_signals():
+    """Unit-level: fleet fixture validates against Fluidstack JD signals."""
+    data = _minimal_good_roadmap()
+    # Add explicit BMC/Redfish role investigation so JD tooling requirement is met
+    inv = copy.deepcopy(data["investigation_roadmap"][3])
+    inv["title"] = "How do BMC/Redfish-style interfaces expose hardware state?"
+    inv["track"] = "role_specific"
+    inv["module_or_folder_added"] = "src/redfish_interface.py"
+    inv["artifact_this_investigation_produces"] = "src/redfish_interface.py"
+    inv["delta_from_previous_investigation"] = "Adds mocked BMC/Redfish telemetry."
+    inv["capstone_delta"] = "n/a — not the capstone"
+    # Insert before capstone
+    data["investigation_roadmap"].insert(4, inv)
+    # Capstone remains last
+    titles = [i["title"] for i in data["investigation_roadmap"]]
+    modules = [i["module_or_folder_added"] for i in data["investigation_roadmap"]]
+    data["roadmap_tracks"]["general_engineering_track"] = [
+        i["title"] for i in data["investigation_roadmap"] if i["track"] == "general"
+    ]
+    data["roadmap_tracks"]["role_specific_track"] = [
+        i["title"] for i in data["investigation_roadmap"] if i["track"] == "role_specific"
+    ]
+    data["cumulative_system"]["repo_growth_model"] = [
+        {
+            "investigation_number": n,
+            "investigation_title": title,
+            "folder_or_module_added": mod,
+            "capability_added": "cap",
+            "why_it_matters": "growth",
+            "evidence_created": "artifact",
+        }
+        for n, title, mod in zip(range(1, len(titles) + 1), titles, modules, strict=True)
+    ]
+    data["proof_of_work_ladder"] = [
+        {
+            "level": n,
+            "title": title,
+            "same_system_name": "fleet-repair-lab",
+            "module_or_folder_added": mod,
+            "extends_previous": "prior",
+            "new_capability_added": "cap",
+            "what_new_proof_it_creates": "proof",
+            "why_this_is_not_a_separate_project": "Same repo.",
+            "evidence": ["README"],
+            "connected_investigations": [title],
+        }
+        for n, title, mod in zip(range(1, len(titles) + 1), titles, modules, strict=True)
+    ]
+    jd = FLUIDSTACK_JD.read_text(encoding="utf-8")
     validate_roadmap(data, job_description=jd)
+
+
+def test_fluidstack_generated_roadmap_passes():
+    path = _latest_json_for_job("fluidstack_production_engineering.md")
+    if path is None or not path.exists():
+        pytest.skip("Fluidstack generated roadmap JSON not present")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    jd = FLUIDSTACK_JD.read_text(encoding="utf-8")
+    validate_roadmap(data, job_description=jd)
+    family = (data.get("role_family") or {}).get("primary_family")
+    if family:
+        assert family == "gpu_fleet_production_engineering"
+
+
+def test_ai_infra_generated_roadmap_passes_when_present():
+    path = _latest_json_for_job("ai_infra_systems.md")
+    if path is None or not path.exists():
+        pytest.skip("AI infra generated roadmap JSON not present")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    jd = AI_INFRA_JD.read_text(encoding="utf-8")
+    validate_roadmap(data, job_description=jd)
+    family = (data.get("role_family") or {}).get("primary_family")
+    assert family == "ai_infrastructure_model_serving"
+    # Ignore schema/guardrail key names that mention Redfish as a forbidden early tool.
+    scan = {k: v for k, v in data.items() if k != "guardrail_checks"}
+    blob = json.dumps(scan).lower()
+    assert "redfish" not in blob and "bmc" not in blob
+    assert any(t in blob for t in ("inference", "latency", "throughput", "serving"))
