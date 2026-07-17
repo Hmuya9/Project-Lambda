@@ -287,7 +287,15 @@ PROJECT_MEASURABLE_METRIC_TERMS = (
     "repair workflow",
     "successfully executed",
     "automated repair",
-    "workflows successfully",
+    "repair pipeline efficiency",
+    "downtime",
+    "downtime reduction",
+    "availability",
+    "fleet availability",
+    "performance baseline",
+    "performance baselines",
+    "baselines before",
+    "pass performance",
 )
 
 OBSERVABILITY_MENTAL_MODEL_TERMS = (
@@ -2062,7 +2070,7 @@ def validate_roadmap(
                     "(prefer latency/throughput/error rate/queue/MTTD/MTTR/etc.)."
                 )
 
-    # 28. missing_mental_models must point at investigations that build them
+    # 28. missing_mental_models must point at EXACT investigation titles
     inv_title_list = [str(inv.get("title") or "").strip() for inv in investigations]
     for i, mm in enumerate(data.get("missing_mental_models") or [], start=1):
         if not isinstance(mm, dict):
@@ -2074,9 +2082,7 @@ def validate_roadmap(
                 f"missing_mental_models[{i}] missing first_investigation_that_builds_it."
             )
             continue
-        if inv_title_list and not any(
-            _titles_exact(pointer, t) or _titles_align(pointer, t) for t in inv_title_list
-        ):
+        if inv_title_list and pointer not in inv_title_list:
             failures.append(
                 f"missing_mental_models[{i}] first_investigation_that_builds_it "
                 f"'{pointer}' does not match any investigation title."

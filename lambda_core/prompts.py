@@ -297,7 +297,16 @@ CONTRACT_JSON_SCHEMA: dict = {
                     "mental_model": {"type": "string"},
                     "why_required_before_role_work": {"type": "string"},
                     "what_goes_wrong_without_it": {"type": "string"},
-                    "first_investigation_that_builds_it": {"type": "string"},
+                    "first_investigation_that_builds_it": {
+                        "type": "string",
+                        "description": (
+                            "MUST be copied EXACTLY from one investigation_roadmap[].title "
+                            "(character-for-character). FORBIDDEN: concepts, slogans, "
+                            "expensive-problem phrases, or rewritten titles "
+                            "(e.g. do NOT write 'Turn deployment/repair into a pipeline, "
+                            "not a procedure.' — use the actual investigation title)."
+                        ),
+                    },
                 },
             },
         },
@@ -1307,8 +1316,11 @@ business KPIs, six-month org targets — unless JD states them AND the project
 has an explicit simulation/proxy.
 
 MISSING MENTAL MODEL MAPPING
-missing_mental_models[].first_investigation_that_builds_it MUST name an
-investigation title that actually builds that model.
+missing_mental_models[].first_investigation_that_builds_it MUST be copied
+EXACTLY from one investigation_roadmap[].title (exact string equality).
+FORBIDDEN: concepts, slogans, expensive-problem phrases, or rewritten titles.
+Wrong: "Turn deployment/repair into a pipeline, not a procedure."
+Right: the actual investigation title, e.g. "How to automate GPU repair workflows?"
 Observability/metrics/alerting models must NOT point at the API investigation;
 point at health checks / metrics & alerts / inference observability instead.
 
@@ -1386,8 +1398,9 @@ Hard requirements for THIS run:
     (general↔general, role_specific↔role_specific). No extras, no paragraphs.
 11. proof_of_work_ladder[i].title == investigation_roadmap[i].title AND
     connected_investigations includes that same title.
-12. missing_mental_models[].first_investigation_that_builds_it must point at an
-    investigation that actually builds it (observability ≠ API investigation).
+12. missing_mental_models[].first_investigation_that_builds_it must be an EXACT
+    copy of an investigation_roadmap[].title (not a concept/slogan/problem phrase).
+    Observability models must not point at the API investigation.
 13. If JD mentions Redfish/BMC/IPMI/firmware telemetry/repair/RMA/fleet hardware,
     include explicit coverage. If not, do NOT invent it.
 14. Capstone LAST with family-correct proof. Final capstone_delta mentions

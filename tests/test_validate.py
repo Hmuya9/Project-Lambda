@@ -774,6 +774,106 @@ def test_observability_mm_cannot_point_at_api_investigation():
     assert "observability" in str(exc.value).lower() or "api" in str(exc.value).lower()
 
 
+def test_align_maps_repair_slogan_to_exact_investigation_title():
+    from lambda_core.align import align_roadmap_structure
+
+    data = _minimal_good_roadmap()
+    # Capstone title is repair-related in the fleet fixture
+    repair_title = data["investigation_roadmap"][4]["title"]
+    assert "repair" in repair_title.lower() or "pipeline" in repair_title.lower()
+    data["missing_mental_models"].append(
+        {
+            "mental_model": "Repair must become a pipeline",
+            "why_required_before_role_work": "Fleet throughput depends on repair automation.",
+            "what_goes_wrong_without_it": "Manual heroics and stuck hosts.",
+            "first_investigation_that_builds_it": (
+                "Turn deployment/repair into a pipeline, not a procedure."
+            ),
+        }
+    )
+    align_roadmap_structure(data)
+    pointer = data["missing_mental_models"][-1]["first_investigation_that_builds_it"]
+    assert pointer == repair_title
+    validate_roadmap(data)
+
+
+def test_align_maps_observability_phrase_to_metrics_or_health_title():
+    from lambda_core.align import align_roadmap_structure
+
+    data = _minimal_good_roadmap()
+    metrics_or_health = [
+        t["title"]
+        for t in data["investigation_roadmap"]
+        if any(k in t["title"].lower() for k in ("health", "metric", "alert"))
+    ]
+    assert metrics_or_health
+    data["missing_mental_models"].append(
+        {
+            "mental_model": "Signal discipline under load",
+            "why_required_before_role_work": "Need measurable health before automation.",
+            "what_goes_wrong_without_it": "Blind pages and noisy alerts.",
+            "first_investigation_that_builds_it": "Observability and alerting",
+        }
+    )
+    align_roadmap_structure(data)
+    pointer = data["missing_mental_models"][-1]["first_investigation_that_builds_it"]
+    assert pointer in metrics_or_health
+    assert pointer in [i["title"] for i in data["investigation_roadmap"]]
+    validate_roadmap(data)
+
+
+def test_align_maps_portability_phrase_to_exact_portability_title():
+    from lambda_core.align import align_roadmap_structure
+
+    data = _minimal_good_roadmap()
+    port_title = data["investigation_roadmap"][0]["title"]
+    data["missing_mental_models"].append(
+        {
+            "mental_model": "Environment mismatch mental model",
+            "why_required_before_role_work": "Deployments fail without portability understanding.",
+            "what_goes_wrong_without_it": "Works on my machine failures.",
+            "first_investigation_that_builds_it": "software portability",
+        }
+    )
+    align_roadmap_structure(data)
+    pointer = data["missing_mental_models"][-1]["first_investigation_that_builds_it"]
+    assert pointer == port_title
+    validate_roadmap(data)
+
+
+def test_unmapped_mental_model_pointer_still_fails_validation():
+    from lambda_core.align import align_roadmap_structure
+
+    data = _minimal_good_roadmap()
+    data["missing_mental_models"].append(
+        {
+            "mental_model": "Quantum annealing schedules",
+            "why_required_before_role_work": "Unrelated concept.",
+            "what_goes_wrong_without_it": "No mapping should exist.",
+            "first_investigation_that_builds_it": (
+                "How do quantum annealers schedule qubit calibrations?"
+            ),
+        }
+    )
+    align_roadmap_structure(data)
+    pointer = data["missing_mental_models"][-1]["first_investigation_that_builds_it"]
+    assert pointer not in [i["title"] for i in data["investigation_roadmap"]]
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "does not match any investigation title" in str(exc.value)
+
+
+def test_validator_requires_exact_title_not_fuzzy_align():
+    data = _minimal_good_roadmap()
+    # Fuzzy-similar but not exact — must fail without running aligner
+    data["missing_mental_models"][0]["first_investigation_that_builds_it"] = (
+        "Why production systems need health checks somehow"
+    )
+    with pytest.raises(ValidationError) as exc:
+        validate_roadmap(data)
+    assert "does not match any investigation title" in str(exc.value)
+
+
 def _latest_json_for_job(job_stem: str) -> Path | None:
     outputs = ROOT / "outputs"
     if not outputs.is_dir():
@@ -844,8 +944,11 @@ def test_fluidstack_generated_roadmap_passes():
     path = _latest_json_for_job("fluidstack_production_engineering.md")
     if path is None or not path.exists():
         pytest.skip("Fluidstack generated roadmap JSON not present")
+    from lambda_core.align import align_roadmap_structure
+
     data = json.loads(path.read_text(encoding="utf-8"))
     jd = FLUIDSTACK_JD.read_text(encoding="utf-8")
+    align_roadmap_structure(data, job_description=jd)
     validate_roadmap(data, job_description=jd)
     family = (data.get("role_family") or {}).get("primary_family")
     if family:
@@ -856,8 +959,11 @@ def test_ai_infra_generated_roadmap_passes_when_present():
     path = _latest_json_for_job("ai_infra_systems.md")
     if path is None or not path.exists():
         pytest.skip("AI infra generated roadmap JSON not present")
+    from lambda_core.align import align_roadmap_structure
+
     data = json.loads(path.read_text(encoding="utf-8"))
     jd = AI_INFRA_JD.read_text(encoding="utf-8")
+    align_roadmap_structure(data, job_description=jd)
     validate_roadmap(data, job_description=jd)
     family = (data.get("role_family") or {}).get("primary_family")
     assert family == "ai_infrastructure_model_serving"
