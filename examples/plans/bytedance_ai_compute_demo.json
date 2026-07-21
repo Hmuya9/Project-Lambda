@@ -1,0 +1,135 @@
+{
+  "meta": {
+    "mode": "targeted",
+    "role_title": "Software Engineer — AI Compute Infrastructure",
+    "company": "ByteDance",
+    "archetype": "AI Infrastructure / GPU Orchestration",
+    "generated": "2026-07-21",
+    "jd_source": "https://joinbytedance.com/search/7553580852757661960"
+  },
+  "role_decode": {
+    "summary": "This team runs the GPU clusters that serve large-model inference at extreme scale. They are not paying for someone who 'knows Kubernetes' — they are paying for someone who can keep expensive GPU fleets busy, route inference requests reliably, and stop a $30k/hr cluster from sitting idle or falling over. Every technology in the JD (vLLM, SGLang, TensorRT-LLM, Kubernetes, Ray) is evidence of five underlying problems: inference cost, GPU utilization, orchestration at scale, distributed resilience, and observability.",
+    "expensive_problems": [
+      { "id": "P11", "problem": "Why is AI inference expensive?", "why_paid": "Inference is the company's largest recurring compute bill; every efficiency point is millions saved.", "jd_evidence": "\"inference solutions using vLLM, SGLang, and TensorRT-LLM\"" },
+      { "id": "P13", "problem": "Why does GPU memory become the bottleneck?", "why_paid": "GPU memory limits batch size and model placement — the core constraint of serving economics.", "jd_evidence": "\"GPU-optimized workloads\", \"AI accelerator infrastructure\"" },
+      { "id": "P17", "problem": "Why do latency and throughput compete?", "why_paid": "User-facing latency SLOs vs. cluster utilization is the daily tradeoff this team manages.", "jd_evidence": "\"extreme performance, scalability, and resilience\"" },
+      { "id": "P34", "problem": "Why does Kubernetes exist?", "why_paid": "Cluster orchestration is the substrate; misconfiguration wastes fleets and causes outages.", "jd_evidence": "\"large-scale, container-based cluster management and orchestration systems\"" },
+      { "id": "P20", "problem": "Why is distributed inference difficult?", "why_paid": "Models no longer fit on one GPU; splitting them multiplies failure modes and coordination cost.", "jd_evidence": "\"large model inference, distributed and parallel systems\"" },
+      { "id": "P61", "problem": "Why is scheduling GPU workloads across a cluster difficult?", "why_paid": "Bad scheduling strands GPU capacity — idle accelerators are pure burn.", "jd_evidence": "\"resource management, scheduling, request routing\"" },
+      { "id": "P25", "problem": "Why do distributed systems fail?", "why_paid": "Resilience at this scale is a hiring requirement, not a bonus; partial failure is the default state.", "jd_evidence": "\"extreme ... resilience\"" },
+      { "id": "P30", "problem": "Why does observability matter?", "why_paid": "You cannot manage a fleet you cannot see; monitoring is listed as a qualifying experience.", "jd_evidence": "\"resource management, scheduling, request routing, monitoring, or orchestration\"" }
+    ],
+    "hard_requirements": [
+      "Understanding of large model inference and distributed/parallel systems",
+      "Hands-on infra experience: resource management, scheduling, routing, monitoring, or orchestration",
+      "Docker + Kubernetes",
+      "Go, Rust, Python, or C++"
+    ],
+    "wishlist": [
+      "Large-scale cluster management (Kubernetes, Ray)",
+      "GPU orchestration/scaling/isolation in production",
+      "CUDA or inference engines",
+      "Cloud ML platforms (AWS/Azure/GCP)"
+    ],
+    "seniority_signal": "2+ yrs · $148k–$301k"
+  },
+  "gap_map": [
+    { "id": "P34", "problem": "Why does Kubernetes exist?", "importance": 5, "transfer": "Automation/control-systems background: an orchestrator is a control loop (desired state vs. actual state) — same mental model as PLC control logic.", "gap": "full", "credibility_risk": "\"Have you ever operated a cluster?\" — must have run one, broken it, and healed it, even at home-lab scale.", "priority": 1 },
+    { "id": "P11", "problem": "Why is AI inference expensive?", "importance": 5, "transfer": "Cost-of-downtime thinking from industrial ops maps directly to cost-of-idle-GPU thinking.", "gap": "full", "credibility_risk": "\"Walk me through what happens memory-wise when a request hits an LLM server\" — needs measured, first-hand numbers.", "priority": 2 },
+    { "id": "P13", "problem": "Why does GPU memory become the bottleneck?", "importance": 5, "transfer": "Strong hardware intuition: memory hierarchies, bandwidth, and thermal limits are physical constraints — home turf.", "gap": "partial", "credibility_risk": "Intuition without measurement reads as hand-waving; must show profiler output, not analogies.", "priority": 3 },
+    { "id": "P17", "problem": "Why do latency and throughput compete?", "importance": 4, "transfer": "Queueing intuition from production-line and equipment-throughput experience.", "gap": "partial", "credibility_risk": "Must express it in inference terms: batch size, TTFT vs. tokens/sec, SLOs.", "priority": 4 },
+    { "id": "P19", "problem": "Why is vLLM faster than naive inference?", "importance": 4, "transfer": "Reverse-engineering complex equipment → reverse-engineering the vLLM scheduler is the same skill.", "gap": "full", "credibility_risk": "Interviewers on this team will probe continuous batching and PagedAttention specifics.", "priority": 5 },
+    { "id": "P30", "problem": "Why does observability matter?", "importance": 4, "transfer": "STRONG: preventive maintenance, sensor monitoring, and fault isolation are observability — the mindset is already professional-grade, only the tools are new.", "gap": "partial", "credibility_risk": "\"Which metrics would you page on?\" — needs hands-on Prometheus/Grafana + SLO definitions.", "priority": 6 },
+    { "id": "P61", "problem": "Why is scheduling GPU workloads across a cluster difficult?", "importance": 4, "transfer": "Resource allocation under physical constraints (power, capacity planning) from industrial settings.", "gap": "full", "credibility_risk": "Named in the JD's qualification sentence — likely an interview theme.", "priority": 7 },
+    { "id": "P20", "problem": "Why is distributed inference difficult?", "importance": 5, "transfer": "Understanding of how failures propagate through coupled systems.", "gap": "full", "credibility_risk": "Depth question; acceptable to reason from fundamentals if the fundamentals are demonstrably solid.", "priority": 8 },
+    { "id": "P25", "problem": "Why do distributed systems fail?", "importance": 4, "transfer": "STRONG: real incident-style troubleshooting on physical systems; failure-mode thinking is native.", "gap": "partial", "credibility_risk": "Must translate to software failure classes: partitions, timeouts, retry storms, partial failure.", "priority": 9 },
+    { "id": "P6", "problem": "Why does Docker exist?", "importance": 3, "transfer": "None direct, but it is the smallest gap on the list and unlocks everything else.", "gap": "partial", "credibility_risk": "Table stakes — a fumbled Docker answer ends the interview.", "priority": 10 }
+  ],
+  "positioning": {
+    "narrative": "I am not a career software engineer learning about machines — I am a machines engineer who has moved into the software that runs them. I spent years keeping industrial equipment alive: diagnosing faults under time pressure, reading failure propagation across electrical, mechanical, and control systems, and working where downtime has a dollar cost per minute. AI compute infrastructure is the same discipline with a different substrate: a GPU fleet is industrial equipment, utilization is throughput, an incident is an incident. I am building public, measured evidence — serving benchmarks, cluster failure drills, postmortems — to prove the software half meets the bar my hardware half already does.",
+    "do_not_claim": [
+      "Professional AI infrastructure or model-serving experience",
+      "Production Kubernetes platform ownership",
+      "Professional distributed-systems ownership at scale",
+      "GPU fleet operations experience",
+      "Production-grade Go/Python service ownership",
+      "Formal SRE or large-scale incident-response ownership"
+    ],
+    "talking_points": [
+      "Control-loop framing: 'Kubernetes reconciliation is a control loop — I've spent years around control loops that move physical machinery.'",
+      "Cost framing: 'I think in cost-of-downtime and cost-of-idle-capacity because I've worked where both are measured in real money.'",
+      "Failure framing: 'I've done root-cause analysis on systems where the failing component lies to you — software observability is the same hunt with better instruments.'",
+      "Evidence framing: every claim in the resume links to a repo, a benchmark table, or a postmortem.",
+      "Honest gap framing: 'I haven't operated production GPU fleets — here is the home-lab fleet I built, broke, and measured instead.'"
+    ]
+  },
+  "sprints": [
+    {
+      "week": 1,
+      "primary": { "id": "P6", "question": "Why does Docker exist — and how does a model get served from inside a container?" },
+      "secondary": ["P8 — What is model serving?", "P10 — What happens when a request hits an AI application?"],
+      "stretch": ["P5 — How do systems communicate over HTTP?"],
+      "evidence": { "artifact": "Repo: small open model (e.g., a 1–3B LLM) served behind a FastAPI endpoint in Docker, with a request-path architecture diagram", "type": "repo", "done_when": "A curl from a second machine returns a completion; README traces the request end-to-end (client → HTTP → container → model → response) and explains every hop." },
+      "interview": ["2 LeetCode (arrays/strings)", "Explain 'why containers' in 2 minutes without notes"]
+    },
+    {
+      "week": 2,
+      "primary": { "id": "P13", "question": "Why does GPU memory become the bottleneck for inference?" },
+      "secondary": ["P12 — Why GPUs instead of CPUs?", "P35 — Why does memory bandwidth matter?"],
+      "stretch": ["P39 — Why does mixed precision speed up AI?"],
+      "evidence": { "artifact": "Benchmark: same model on CPU vs. GPU (rented spot instance is fine) — tokens/sec, memory footprint vs. context length, profiler screenshots", "type": "benchmark", "done_when": "A table shows measured memory growth as context length increases, and the README explains where the memory goes (weights vs. KV cache vs. activations) from the measurements, not from a blog post." },
+      "interview": ["2 LeetCode (hash maps)", "Explain the GPU memory budget of an LLM server in 2 minutes"]
+    },
+    {
+      "week": 3,
+      "primary": { "id": "P17", "question": "Why do latency and throughput compete in model serving?" },
+      "secondary": ["P15 — Why does KV cache exist?", "P16 — Why does batching improve throughput?"],
+      "stretch": [],
+      "evidence": { "artifact": "Benchmark: naive HF serving vs. vLLM under a load generator — TTFT and tokens/sec vs. concurrency, plotted", "type": "benchmark", "done_when": "The latency/throughput curve is plotted from own measurements and the writeup states the batch-size tradeoff numerically ('at concurrency N, p95 TTFT degraded X% while throughput gained Y%')." },
+      "interview": ["2 LeetCode (two pointers)", "1 system design: design a model-serving endpoint with a p95 latency SLO"]
+    },
+    {
+      "week": 4,
+      "primary": { "id": "P19", "question": "Why is vLLM faster than naive inference?" },
+      "secondary": ["Reverse-engineer the vLLM scheduler: continuous batching + PagedAttention"],
+      "stretch": ["P18 — Why does quantization help?"],
+      "evidence": { "artifact": "Writeup + diagram: 'How vLLM schedules requests' — annotated walk through the actual scheduler code path, with a control-loop analogy section", "type": "diagram", "done_when": "The diagram matches the real code (file/function names cited); a reader could follow one request through admission, batching, and KV block allocation." },
+      "interview": ["2 LeetCode (stacks/queues)", "Explain continuous batching in 2 minutes"]
+    },
+    {
+      "week": 5,
+      "primary": { "id": "P34", "question": "Why does Kubernetes exist — and what is it actually doing when it 'heals' a workload?" },
+      "secondary": ["P7 — How do companies deploy without breaking everything?"],
+      "stretch": ["P33 — Why do microservices increase complexity?"],
+      "evidence": { "artifact": "Repo: k3s cluster (2–3 nodes, VMs fine) running the Week-1 model service; kill pods and a node under load; failure-mode table of what broke and how reconciliation recovered", "type": "failure-mode-table", "done_when": "The failure-mode table has ≥6 induced failures with observed behavior, recovery time, and the reconciliation mechanism responsible — written like an industrial FMEA." },
+      "interview": ["2 LeetCode (trees)", "Explain the reconciliation loop as a control loop in 2 minutes"]
+    },
+    {
+      "week": 6,
+      "primary": { "id": "P30", "question": "Why does observability matter — and what would I page on for a model-serving fleet?" },
+      "secondary": ["P26 — Why does tail latency matter?"],
+      "stretch": ["P31/P32 — retries and idempotency"],
+      "evidence": { "artifact": "Demo: Prometheus + Grafana on the cluster — GPU/latency/saturation dashboards, 3 defined SLOs, 2 alert rules, and a recorded walkthrough", "type": "demo", "done_when": "An induced fault (memory pressure or pod kill) visibly fires the right alert; the README argues WHY these 3 SLOs and not others." },
+      "interview": ["2 LeetCode (BFS/DFS)", "1 system design: observability for an inference fleet"]
+    },
+    {
+      "week": 7,
+      "primary": { "id": "P61", "question": "Why is scheduling GPU workloads across a cluster difficult?" },
+      "secondary": ["P22 — Why do GPUs sit idle?", "Request routing across replicas"],
+      "stretch": ["P20 — first pass at distributed inference concepts"],
+      "evidence": { "artifact": "Repo: two model services sharing constrained GPU/compute on the cluster — measure utilization under three scheduling/routing policies, benchmark the differences", "type": "benchmark", "done_when": "A utilization-vs-policy table shows measured differences and the writeup explains which policy strands capacity and why — framed as a capacity-allocation problem." },
+      "interview": ["2 LeetCode (heaps)", "Explain why idle GPUs are the most expensive failure mode in 2 minutes"]
+    },
+    {
+      "week": 8,
+      "primary": { "id": "P25", "question": "Why do distributed systems fail — and can I run an incident like a professional?" },
+      "secondary": ["P20 — Why is distributed inference difficult? (synthesis)"],
+      "stretch": ["Mock interview loop against the whole portfolio"],
+      "evidence": { "artifact": "Capstone postmortem: inject a compound failure (node loss + retry storm) into the full stack, run it as a real incident — timeline, detection, mitigation, root cause, action items", "type": "postmortem", "done_when": "The postmortem would pass review by a senior SRE: blameless, timestamped, with a 'what the monitoring missed' section; portfolio README links all 8 weeks of evidence." },
+      "interview": ["1 full mock interview", "Explain any portfolio project cold, in 2 minutes each"]
+    }
+  ],
+  "new_backlog_entries": [
+    { "id": "P61", "problem": "Why is scheduling GPU workloads across a cluster difficult?", "domain": "AI Systems & Infrastructure" }
+  ]
+}
