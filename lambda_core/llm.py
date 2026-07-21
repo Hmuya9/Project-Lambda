@@ -52,12 +52,30 @@ def complete_json(
     prompt = user
     last_err: Exception | None = None
     for _ in range(retries + 1):
-        message = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        try:
+            message = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=system,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except anthropic.AuthenticationError as err:
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY was rejected. Check the key in .env "
+                "(console.anthropic.com → API keys). API said: " + str(err)
+            ) from err
+        except anthropic.NotFoundError as err:
+            raise RuntimeError(
+                f"Model '{model}' is not available to your account. Set "
+                "ANTHROPIC_MODEL in .env to a model you have access to "
+                "(see docs.claude.com/en/docs/about-claude/models). "
+                "API said: " + str(err)
+            ) from err
+        except anthropic.APIStatusError as err:
+            raise RuntimeError(
+                f"Anthropic API error (HTTP {err.status_code}) with model "
+                f"'{model}': {err.message}"
+            ) from err
         text = "".join(b.text for b in message.content if b.type == "text")
         try:
             return _extract_json(text)

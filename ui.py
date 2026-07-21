@@ -62,19 +62,27 @@ if st.button("Generate plan", type="primary"):
             "required. Nothing is tailored without them."
         )
         st.stop()
+    import traceback
+
     from lambda_core.pipeline import run_pipeline
 
+    st.session_state.pop("error", None)
     with st.status("Running the Lambda pipeline...", expanded=True) as status:
         try:
             plan = run_pipeline(
                 job_text, profile_text, intent=intent, weeks=weeks, update_backlog=update_backlog
             )
+            status.update(label="Plan generated", state="complete")
+            st.session_state["plan"] = plan
         except Exception as exc:  # surface config/API errors readably
             status.update(label="Pipeline failed", state="error")
-            st.exception(exc)
-            st.stop()
-        status.update(label="Plan generated", state="complete")
-    st.session_state["plan"] = plan
+            st.session_state["error"] = (str(exc), traceback.format_exc())
+
+# Errors render OUTSIDE the collapsible status box so they are always visible.
+if err := st.session_state.get("error"):
+    st.error(err[0])
+    with st.expander("Full traceback"):
+        st.code(err[1])
 
 plan = st.session_state.get("plan")
 if plan:
