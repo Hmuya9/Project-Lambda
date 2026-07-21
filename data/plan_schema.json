@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lambda plan.json",
+  "type": "object",
+  "required": ["meta", "role_decode", "gap_map", "positioning", "sprints"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["mode", "role_title", "archetype", "generated"],
+      "properties": {
+        "mode": { "enum": ["targeted", "directional", "exploratory"] },
+        "role_title": { "type": "string" },
+        "company": { "type": "string" },
+        "archetype": { "type": "string" },
+        "generated": { "type": "string", "description": "YYYY-MM-DD" },
+        "jd_source": { "type": "string" }
+      }
+    },
+    "role_decode": {
+      "type": "object",
+      "required": ["summary", "expensive_problems"],
+      "properties": {
+        "summary": { "type": "string" },
+        "expensive_problems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "problem", "why_paid"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^P[0-9]+$" },
+              "problem": { "type": "string" },
+              "why_paid": { "type": "string" },
+              "jd_evidence": { "type": "string" }
+            }
+          }
+        },
+        "hard_requirements": { "type": "array", "items": { "type": "string" } },
+        "wishlist": { "type": "array", "items": { "type": "string" } },
+        "seniority_signal": { "type": "string" }
+      }
+    },
+    "gap_map": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "problem", "importance", "transfer", "gap", "priority"],
+        "properties": {
+          "id": { "type": "string" },
+          "problem": { "type": "string" },
+          "importance": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "transfer": { "type": "string" },
+          "gap": { "enum": ["none", "partial", "full"] },
+          "credibility_risk": { "type": "string" },
+          "priority": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "positioning": {
+      "type": "object",
+      "required": ["narrative", "do_not_claim", "talking_points"],
+      "properties": {
+        "narrative": { "type": "string" },
+        "do_not_claim": { "type": "array", "items": { "type": "string" } },
+        "talking_points": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "sprints": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["week", "primary", "evidence"],
+        "properties": {
+          "week": { "type": "integer", "minimum": 1 },
+          "primary": {
+            "type": "object",
+            "required": ["id", "question"],
+            "properties": { "id": { "type": "string" }, "question": { "type": "string" } }
+          },
+          "secondary": { "type": "array", "items": { "type": "string" } },
+          "stretch": { "type": "array", "items": { "type": "string" } },
+          "evidence": {
+            "type": "object",
+            "required": ["artifact", "type", "done_when"],
+            "properties": {
+              "artifact": { "type": "string" },
+              "type": { "enum": ["repo", "benchmark", "postmortem", "diagram", "demo", "failure-mode-table", "readme", "writeup"] },
+              "done_when": { "type": "string" }
+            }
+          },
+          "interview": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "new_backlog_entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "problem", "domain"],
+        "properties": {
+          "id": { "type": "string" },
+          "problem": { "type": "string" },
+          "domain": { "type": "string" }
+        }
+      }
+    }
+  }
+}

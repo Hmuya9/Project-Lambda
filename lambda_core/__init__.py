@@ -1,1 +1,1 @@
-"""Project Lambda package root."""
+"""Project Lambda core."""
