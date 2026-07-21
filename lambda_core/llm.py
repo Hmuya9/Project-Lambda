@@ -7,7 +7,7 @@ import os
 import re
 from typing import Any
 
-DEFAULT_MODEL = "claude-sonnet-4-5"
+DEFAULT_MODEL = "claude-sonnet-5"
 
 
 def resolve_config() -> tuple[str, str]:
