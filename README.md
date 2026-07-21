@@ -1,96 +1,90 @@
 # Project Lambda
 
-Local-first Python MVP: a **Role-to-Roadmap Engine** that turns a **technical job description** + an **engineer background** into an engineering-growth plan — expensive problems, mental models, skill dependencies, progressive investigations, a proof-of-work ladder, evidence, and interview readiness.
+**The market pays for proximity to expensive problems — not for knowing Python or Rust** (tools matter, but as means). Project Lambda structures study around that thesis: it turns an **engineer profile** + a **market intent** into an evidence-driven plan — expensive problems decoded, gaps mapped against what actually transfers, weekly sprints that each end in proof-of-work, and honest positioning.
 
-It is **not** a one-shot project generator, career coach, resume scorer, or interview tutor.
+Lambda assumes nobody's goal. It is not "come become a better software engineer" — that is one possible intent among many. **Nothing is tailored until intake captures a profile and an intent:**
 
-## Project Philosophy
+- **targeted** — "I want this job" (one job description)
+- **directional** — "I want to be highly employable in domain X" (a market composite)
+- **exploratory** — "I want to become more valuable overall" (narrowing intent is part of the work)
 
-Project Lambda is built from a problem-first engineering apprenticeship system. See docs/mission_brief_v2.md for the operating philosophy, learning model, evidence standard, and engineering rules.
+## Architecture
 
-## What it produces
+**The engine is fixed; the JD is data — and so is the user.** A new JD (or a new person) produces a new *mapping*, never a new workflow. Reasoning is staged, each stage with a small contract — not one giant schema policed by regex:
 
-1. **Role interpretation** + expensive problem map
-2. **Surface keywords → deep skills**, candidate transfer strengths / real gaps
-3. **General value threshold** + skill dependency graph
-4. **Investigation roadmap** (5–8 progressive Why-investigations)
-5. **Proof-of-work ladder** (small → final; final only after prerequisites)
-6. **First investigation prompt** (paste-ready)
-7. **Evidence plan** (Obsidian / GitHub) + **interview readiness map**
-8. Markdown (and optional JSON) under `outputs/`
+```
+INTAKE (gate)   profile + intent — nothing tailored without both
+   ↓
+DECODE          the 5–10 expensive problems the posting actually pays for
+   ↓               (technologies are EVIDENCE of problems, not a curriculum)
+MAP             match onto the domain backlog (data/backlog.md, stable IDs;
+   ↓                grows with new IDs, never mutates)
+INTERSECT       per problem: what transfers (profile is law), gap severity,
+   ↓                credibility risk
+RANK            deterministic code: importance × gap, foundations first
+   ↓
+PLAN            weekly sprints, one evidence artifact each with a "done when"
+   ↓                a skeptical senior reviewer would accept + honest positioning
+RENDER          plan.json → Obsidian vault + self-contained dashboard (offline)
+```
 
 ## Project shape
 
 ```
-app.py                 # CLI entrypoint
-ui.py                  # local Streamlit UI (wraps the same generator)
+app.py                       # CLI: generate (pipeline) / render (offline)
+ui.py                        # local Streamlit UI, same pipeline
 lambda_core/
-  prompts.py           # system prompt + JSON schema (iterate here)
-  inputs.py            # load / paste JD + profile
-  outputs.py           # Markdown render + file write
-  generator.py         # single LLM call
-examples/
-  jobs/                # sample job descriptions
-  profiles/            # sample engineer backgrounds
-outputs/               # generated roadmaps
+  llm.py                     # thin Anthropic client (JSON in/out)
+  prompts.py                 # per-stage prompts (iterate quality here)
+  pipeline.py                # the staged pipeline + deterministic ranking
+  backlog.py                 # domain backlog: parse / prompt-format / grow
+  validate.py                # slim: JSON Schema + a few substance floors
+  render.py                  # plan.json → vault + dashboard (no LLM)
+data/
+  backlog.md                 # domain backlog (P1–P61+), grows via runs
+  plan_schema.json           # the plan.json contract (CLI ↔ dashboard ↔ skill)
+assets/dashboard_template.html
+skill/lambda-targeted/       # Claude skill: run the same pipeline conversationally
+docs/                        # constitution (framework) + engine spec + instance brief
+examples/                    # sample JDs, profiles, and a rendered demo plan
 ```
 
 ## Setup
 
 ```bash
-cd "c:\Project Lambda"
-python -m venv .venv
-.venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env
+cp .env.example .env                                 # set ANTHROPIC_API_KEY
 ```
 
-Edit `.env` and set `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`).
-
-For a local OpenAI-compatible server (e.g. Ollama):
-
-```env
-OPENAI_API_KEY=ollama
-OPENAI_BASE_URL=http://localhost:11434/v1
-OPENAI_MODEL=llama3.1
-```
-
-## Run (CLI)
+## Run
 
 ```bash
-python app.py --job examples/jobs/fluidstack_production_engineering.md --profile examples/profiles/your_real_profile.md
-```
+# Full pipeline (needs ANTHROPIC_API_KEY)
+python app.py generate -j examples/jobs/ai_infra_systems.md -p examples/profiles/your_real_profile.md
 
-Options:
+# Directional intent: pass a domain brief or several postings concatenated
+python app.py generate -j my_domain_composite.md -p profile.md --intent directional
 
-| Flag | Meaning |
-|------|---------|
-| `--job` / `-j` | Job description file |
-| `--profile` / `-p` | Engineer profile file |
-| `--interactive` / `-i` | Paste missing text (end with `END`) |
-| `--out` / `-o` | Custom Markdown path |
-| `--json` | Also write a `.json` sidecar |
-| `--stdout` | Print Markdown to stdout |
+# Offline: render an existing plan.json (no API key needed)
+python app.py render examples/plans/bytedance_ai_compute_demo.json
 
-Example with JSON sidecar:
-
-```bash
-python app.py -j examples/jobs/fluidstack_production_engineering.md -p examples/profiles/your_real_profile.md --json
-```
-
-## Run (UI)
-
-Local Streamlit UI wrapping the same generator (no redeploy / no cloud):
-
-```bash
-pip install -r requirements.txt
+# UI
 streamlit run ui.py
 ```
 
-Paste a raw job description and engineer profile, click **Generate**, preview the Role-to-Roadmap Markdown, then save or download Markdown/JSON under `outputs/`. Example files can be loaded from `examples/jobs` and `examples/profiles`.
+Output per run: `plan.json`, a self-contained `dashboard.html`, and an Obsidian-ready `vault/` (plan overview, positioning, weekly sprint files, engineering-page stubs).
 
-The CLI (`app.py`) continues to work as before.
+## Iterating on quality
 
-## Iteration
+Edit `lambda_core/prompts.py` only. If you feel the urge to add output-policing code, resist it — fix the stage prompt instead. `validate.py` is deliberately small; if it grows past ~100 lines, something upstream is broken.
 
-Improve output quality by editing `lambda_core/prompts.py` only — schema + system prompt. Keep I/O and CLI stable unless you need new product surface.
+## Anti-overfit test
+
+Run two very different JDs **and** two very different profiles through the identical pipeline. If any stage needs changing, something overfit — fix the output, never the pipeline. The engine contains zero JD-specific and zero user-specific logic.
+
+## Tests
+
+```bash
+python -m pytest tests/ -q      # offline: schema, backlog, ranking, rendering
+```

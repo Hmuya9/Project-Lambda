@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lambda Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --ink-1: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --seq-250: #86b6ef; --seq-400: #3987e5; --seq-550: #1c5cab; --seq-700: #0d366b;
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+    --accent: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+      --accent: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d;
+    --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page); color: var(--ink-1);
+    padding: 24px; max-width: 1180px; margin: 0 auto;
+  }
+  h1 { font-size: 22px; font-weight: 700; }
+  h2 { font-size: 15px; font-weight: 650; margin-bottom: 10px; color: var(--ink-1); }
+  .sub { color: var(--ink-2); font-size: 13px; margin-top: 4px; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .chip { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--border); color: var(--ink-2); background: var(--surface-1); margin-right: 6px; }
+  .toggle { font-size: 12px; border: 1px solid var(--border); background: var(--surface-1); color: var(--ink-2); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+  section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .tile .v { font-size: 26px; font-weight: 700; }
+  .tile .l { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  /* gap map table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); font-weight: 600; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--baseline); }
+  td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--grid); vertical-align: top; color: var(--ink-2); }
+  td.prob { color: var(--ink-1); font-weight: 550; min-width: 180px; }
+  td .pid { color: var(--ink-muted); font-weight: 400; font-size: 11.5px; margin-right: 6px; }
+  .imp { display: inline-flex; gap: 2px; align-items: center; }
+  .imp i { width: 9px; height: 14px; border-radius: 3px; background: var(--grid); display: inline-block; }
+  .imp i.on1 { background: var(--seq-250); } .imp i.on2 { background: var(--seq-400); }
+  .imp i.on3 { background: var(--seq-400); } .imp i.on4 { background: var(--seq-550); }
+  .imp i.on5 { background: var(--seq-700); }
+  .gap { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .gap .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .gap.none  { color: var(--status-good); }    .gap.none .dot { background: var(--status-good); }
+  .gap.partial { color: var(--ink-1); }        .gap.partial .dot { background: var(--status-warning); }
+  .gap.full  { color: var(--ink-1); }          .gap.full .dot { background: var(--status-serious); }
+  /* sprint board */
+  .weeks { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .week { border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface-1); }
+  .week .head { display: flex; justify-content: space-between; align-items: center; }
+  .week .wk { font-weight: 700; font-size: 13px; }
+  .week .primary { font-size: 14px; font-weight: 600; color: var(--ink-1); }
+  .week .list { font-size: 12.5px; color: var(--ink-2); }
+  .week .list b { color: var(--ink-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-top: 4px; }
+  .evbox { border-left: 3px solid var(--accent); padding: 6px 10px; background: color-mix(in srgb, var(--accent) 6%, transparent); border-radius: 0 8px 8px 0; font-size: 12.5px; color: var(--ink-2); }
+  .evbox b { color: var(--ink-1); }
+  .stbtn { align-self: flex-start; font-size: 11.5px; font-weight: 600; border-radius: 99px; padding: 3px 10px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--ink-2); }
+  .stbtn.doing { border-color: var(--status-warning); color: var(--ink-1); }
+  .stbtn.done { border-color: var(--status-good); color: var(--status-good); }
+  /* positioning */
+  .pos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .pos-grid { grid-template-columns: 1fr; } }
+  .pos p { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
+  ul { padding-left: 18px; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+  .dnc li::marker { color: var(--status-critical); }
+  footer { color: var(--ink-muted); font-size: 11.5px; text-align: center; padding: 8px 0 24px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 id="title"></h1>
+    <div class="sub" id="subtitle"></div>
+    <div style="margin-top:8px" id="chips"></div>
+  </div>
+  <button class="toggle" onclick="toggleTheme()">Light / Dark</button>
+</header>
+
+<div class="tiles" id="tiles"></div>
+
+<section>
+  <h2>Role Decode — what this job actually pays for</h2>
+  <p class="sub" id="decode-summary" style="margin-bottom:10px"></p>
+  <table>
+    <thead><tr><th>Problem</th><th>Why they pay</th><th>JD evidence</th></tr></thead>
+    <tbody id="decode-body"></tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Gap Map — profile vs. role</h2>
+  <table>
+    <thead><tr><th>Problem</th><th>Importance</th><th>Gap</th><th>What transfers</th><th>Credibility risk</th></tr></thead>
+    <tbody id="gap-body"></tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Sprint Board</h2>
+  <p class="sub" style="margin-bottom:10px">Click a sprint's status to cycle To&nbsp;do → In&nbsp;progress → Done. (View state only — the vault files are the source of truth.)</p>
+  <div class="weeks" id="weeks"></div>
+</section>
+
+<section class="pos">
+  <h2>Positioning</h2>
+  <p id="narrative" style="margin-bottom:12px"></p>
+  <div class="pos-grid">
+    <div><h2>Talking points</h2><ul id="talking"></ul></div>
+    <div><h2>Do not claim</h2><ul class="dnc" id="dnc"></ul></div>
+  </div>
+</section>
+
+<footer id="foot"></footer>
+
+<script>
+const PLAN = /*__PLAN_JSON__*/null;
+
+function el(id){ return document.getElementById(id); }
+function esc(s){ const d=document.createElement('span'); d.textContent=s??''; return d.innerHTML; }
+function toggleTheme(){
+  const r=document.documentElement;
+  const dark = r.getAttribute('data-theme')==='dark' || (!r.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+  r.setAttribute('data-theme', dark ? 'light' : 'dark');
+}
+
+if (!PLAN) {
+  document.body.innerHTML = '<p style="padding:40px;color:var(--ink-2)">No plan data injected. Run <code>python lambda.py plan.json</code> to generate a populated dashboard.</p>';
+} else {
+  const m = PLAN.meta || {};
+  el('title').textContent = m.role_title + (m.company ? ' @ ' + m.company : '');
+  el('subtitle').textContent = 'Project Lambda — targeted plan · generated ' + (m.generated || '');
+  el('chips').innerHTML = '<span class="chip">' + esc(m.archetype) + '</span><span class="chip">' + esc(m.mode) + ' mode</span>' + ((PLAN.role_decode||{}).seniority_signal ? '<span class="chip">' + esc(PLAN.role_decode.seniority_signal) + '</span>' : '');
+
+  const gaps = PLAN.gap_map || [];
+  const sprints = PLAN.sprints || [];
+  const fullGaps = gaps.filter(g => g.gap === 'full').length;
+  const tiles = [
+    [sprints.length, 'sprints planned'],
+    [gaps.length, 'problems mapped'],
+    [fullGaps, 'full gaps to close'],
+    [gaps.filter(g => g.gap === 'partial').length, 'partial gaps — translate & prove'],
+    [gaps.filter(g => g.gap === 'none').length, 'strengths — prove fast'],
+  ];
+  el('tiles').innerHTML = tiles.map(t => '<div class="tile"><div class="v">' + t[0] + '</div><div class="l">' + esc(t[1]) + '</div></div>').join('');
+
+  el('decode-summary').textContent = (PLAN.role_decode||{}).summary || '';
+  el('decode-body').innerHTML = ((PLAN.role_decode||{}).expensive_problems||[]).map(p =>
+    '<tr><td class="prob"><span class="pid">' + esc(p.id) + '</span>' + esc(p.problem) + '</td><td>' + esc(p.why_paid) + '</td><td><em style="color:var(--ink-muted)">' + esc(p.jd_evidence||'') + '</em></td></tr>'
+  ).join('');
+
+  const gapLabel = { none: 'None — strength', partial: 'Partial', full: 'Full gap' };
+  const gapIcon = { none: '✓', partial: '◐', full: '▲' };
+  el('gap-body').innerHTML = gaps.slice().sort((a,b)=>(a.priority||99)-(b.priority||99)).map(g => {
+    let bars = '';
+    for (let i=1;i<=5;i++) bars += '<i class="' + (i<= (g.importance||0) ? 'on'+g.importance : '') + '"></i>';
+    return '<tr><td class="prob"><span class="pid">' + esc(g.id) + '</span>' + esc(g.problem) + '</td>' +
+      '<td><span class="imp" title="importance ' + (g.importance||0) + '/5">' + bars + '</span></td>' +
+      '<td><span class="gap ' + esc(g.gap) + '"><span class="dot"></span>' + gapIcon[g.gap] + ' ' + gapLabel[g.gap] + '</span></td>' +
+      '<td>' + esc(g.transfer) + '</td><td>' + esc(g.credibility_risk||'') + '</td></tr>';
+  }).join('');
+
+  const stCycle = ['todo','doing','done'];
+  const stLabel = { todo: 'To do', doing: '⏳ In progress', done: '✓ Done' };
+  el('weeks').innerHTML = sprints.map((s,i) => {
+    const sec = (s.secondary||[]).map(esc).join(' · ');
+    const str = (s.stretch||[]).map(esc).join(' · ');
+    const iv = (s.interview||[]).map(esc).join(' · ');
+    return '<div class="week"><div class="head"><span class="wk">Week ' + s.week + ' <span class="pid">' + esc((s.primary||{}).id||'') + '</span></span>' +
+      '<button class="stbtn" data-i="' + i + '" data-s="todo" onclick="cycle(this)">To do</button></div>' +
+      '<div class="primary">' + esc((s.primary||{}).question||'') + '</div>' +
+      '<div class="list">' + (sec ? '<b>Secondary</b>' + sec : '') + (str ? '<b>Stretch</b>' + str : '') + '</div>' +
+      '<div class="evbox"><b>Evidence · ' + esc((s.evidence||{}).type||'') + ':</b> ' + esc((s.evidence||{}).artifact||'') +
+      '<br><b>Done when:</b> ' + esc((s.evidence||{}).done_when||'') + '</div>' +
+      (iv ? '<div class="list"><b>Interview</b>' + iv + '</div>' : '') + '</div>';
+  }).join('');
+
+  window.cycle = function(btn){
+    const next = stCycle[(stCycle.indexOf(btn.dataset.s)+1)%3];
+    btn.dataset.s = next; btn.textContent = stLabel[next];
+    btn.className = 'stbtn' + (next==='todo' ? '' : ' ' + next);
+  };
+
+  el('narrative').textContent = (PLAN.positioning||{}).narrative || '';
+  el('talking').innerHTML = ((PLAN.positioning||{}).talking_points||[]).map(t => '<li>' + esc(t) + '</li>').join('');
+  el('dnc').innerHTML = ((PLAN.positioning||{}).do_not_claim||[]).map(t => '<li>' + esc(t) + '</li>').join('');
+  el('foot').textContent = 'Project Lambda · the goal this week is not to study more — the goal is to become more valuable.';
+}
+</script>
+</body>
+</html>
