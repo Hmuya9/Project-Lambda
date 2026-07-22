@@ -170,15 +170,33 @@ def rank(gap_map: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return ordered
 
 
+def _problem_key(text: Any) -> str:
+    """Loose text key for detecting the same problem under light rewording."""
+    return re.sub(r"[^a-z0-9 ]+", "", str(text).lower()).strip()
+
+
 def assign_ids(
-    mappings: list[dict[str, Any]], start_counter: int
+    mappings: list[dict[str, Any]],
+    start_counter: int,
+    existing: list[Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str]]:
     """Resolve mapping-stage output into final backlog IDs.
 
     Returns (mapped, new_entries, id_by_problem) where id_by_problem keys the
     ORIGINAL decoded problem wording to its final ID (never the literal "NEW").
     Non-dict entries are skipped; a malformed/blank backlog_id is treated as NEW.
+
+    Dedup guarantees:
+    - a NEW problem whose text already matches an existing backlog entry gets
+      the EXISTING id (the model failed to match; we match for it),
+    - two NEW mappings with the same problem text share ONE new id,
+    - no duplicate (id, problem) pair in the mapped output.
     """
+    existing_by_key = {
+        _problem_key(p.problem): p.id for p in (existing or []) if hasattr(p, "id")
+    }
+    assigned_new: dict[str, str] = {}
+    seen_ids: set[str] = set()
     mapped: list[dict[str, Any]] = []
     new_entries: list[dict[str, Any]] = []
     id_by_problem: dict[str, str] = {}
@@ -186,24 +204,29 @@ def assign_ids(
     for m in mappings:
         if not isinstance(m, dict):
             continue
+        problem_text = str(m.get("backlog_problem") or m.get("problem", ""))
+        key = _problem_key(problem_text)
         backlog_id = str(m.get("backlog_id", "")).strip()
         if not _PID.match(backlog_id):
-            backlog_id = f"P{counter}"
-            counter += 1
-            new_entries.append(
-                {
-                    "id": backlog_id,
-                    "problem": str(m.get("backlog_problem") or m.get("problem", "")),
-                    "domain": str(m.get("domain") or "Added from targeted runs"),
-                }
-            )
+            if key in existing_by_key:
+                backlog_id = existing_by_key[key]  # model said NEW; text says match
+            elif key in assigned_new:
+                backlog_id = assigned_new[key]  # same NEW problem twice → one id
+            else:
+                backlog_id = f"P{counter}"
+                counter += 1
+                assigned_new[key] = backlog_id
+                new_entries.append(
+                    {
+                        "id": backlog_id,
+                        "problem": problem_text,
+                        "domain": str(m.get("domain") or "Added from targeted runs"),
+                    }
+                )
         id_by_problem[str(m.get("problem", ""))] = backlog_id
-        mapped.append(
-            {
-                "id": backlog_id,
-                "problem": str(m.get("backlog_problem") or m.get("problem", "")),
-            }
-        )
+        if backlog_id not in seen_ids:
+            seen_ids.add(backlog_id)
+            mapped.append({"id": backlog_id, "problem": problem_text})
     return mapped, new_entries, id_by_problem
 
 
@@ -213,10 +236,12 @@ def normalize_gap_map(
     """Guarantee every gap-map entry satisfies the plan schema.
 
     Fills missing id/problem from the mapped list by position, defaults every
-    schema-required field, and drops non-dict entries. After this, gap_map can
-    never be the source of a final-validation failure.
+    schema-required field, drops non-dict entries, and drops DUPLICATE ids —
+    each problem appears exactly once. After this, gap_map can never be the
+    source of a final-validation failure.
     """
     out: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for i, g in enumerate(gap_map):
         if not isinstance(g, dict):
             continue
@@ -224,6 +249,9 @@ def normalize_gap_map(
         pid = str(g.get("id", "")).strip()
         if not _PID.match(pid):
             pid = str(fallback.get("id", "P0")) or "P0"
+        if pid in seen:
+            continue
+        seen.add(pid)
         out.append(
             {
                 "id": pid,
@@ -283,7 +311,7 @@ def run_discovery(
 
     # Assign real IDs to NEW problems; optionally grow the backlog (never mutate).
     mapped, new_entries, id_by_problem = assign_ids(
-        mapping.get("mappings", []), backlog_mod.next_id(problems)
+        mapping.get("mappings", []), backlog_mod.next_id(problems), problems
     )
     if not mapped:
         raise RuntimeError(

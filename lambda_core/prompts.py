@@ -69,7 +69,13 @@ Company may be "" if not stated. Phrase each problem as a question starting with
 def map_prompt(decoded_problems: list[dict], backlog_block: str) -> str:
     import json
 
-    return f"""Map each decoded problem onto the domain backlog below. Match to an existing ID whenever the underlying problem is the same (expect most to match — that is the point). Only a genuinely new problem gets "NEW".
+    return f"""Map each decoded problem onto the domain backlog below.
+
+MATCHING RULES — bias strongly toward MATCH:
+- Match on the UNDERLYING problem, not the wording. "Why is turning repair into an automated pipeline necessary?" and "Why is automating hardware repair at fleet scale difficult?" are the SAME problem — match it.
+- "NEW" is allowed ONLY when no backlog entry covers the same underlying question from any angle. A typical job description yields 0-2 NEW entries, not 5.
+- Before answering NEW, re-scan the backlog once more asking: "would answering that existing question also answer this one?" If yes → match.
+- Never emit two mappings with the same NEW problem, and never restate an existing backlog problem as NEW.
 
 DECODED PROBLEMS:
 {json.dumps(decoded_problems, indent=2)}

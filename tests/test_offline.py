@@ -314,9 +314,12 @@ def test_run_pipeline_end_to_end_with_messy_mock_llm(monkeypatch):
     ids = [p["id"] for p in plan["role_decode"]["expensive_problems"]]
     assert all(ids) and "NEW" not in ids and "" not in ids
     assert ids[0] == "P25"                      # positional fallback for reworded problem
-    # Blank and NEW backlog_ids became fresh sequential ids.
+    # The blank-id "Why does observability matter?" mapping text-matches the
+    # EXISTING backlog entry (P30) — no new id minted for it. Only the genuinely
+    # new toil problem gets a fresh id.
     new_ids = [e["id"] for e in plan["new_backlog_entries"]]
-    assert len(new_ids) == 2 and all(i.startswith("P") for i in new_ids)
+    assert len(new_ids) == 1 and all(i.startswith("P") for i in new_ids)
+    assert "P30" in [g["id"] for g in plan["gap_map"]]
     # Messy gap map was normalized: enums valid, ints in range, priorities 1..n.
     for g in plan["gap_map"]:
         assert g["gap"] in ("none", "partial", "full")
@@ -448,3 +451,46 @@ def test_normalize_sprints_handles_free_form_model_output():
 def test_verification_log_is_schema_legal(demo_plan):
     demo_plan["sprints"][0]["evidence"]["type"] = "verification-log"
     validate_plan(demo_plan)
+
+
+# --- dedupe (regression: duplicate P66 rows; NEW-minting for existing text) --
+
+def test_assign_ids_dedupes_new_and_matches_existing_text():
+    from lambda_core.backlog import load_backlog
+    from lambda_core.pipeline import assign_ids
+
+    problems = load_backlog()
+    start = 900
+    mappings = [
+        # Model says NEW but the text matches an existing backlog entry → existing id wins.
+        {"problem": "reworded", "backlog_id": "NEW",
+         "backlog_problem": "Why does Kubernetes exist?", "domain": ""},
+        # The same NEW problem twice → ONE shared new id, one backlog entry.
+        {"problem": "a", "backlog_id": "NEW",
+         "backlog_problem": "Why is live compute migration hard?", "domain": "Ops"},
+        {"problem": "b", "backlog_id": "NEW",
+         "backlog_problem": "Why is live compute migration HARD?", "domain": "Ops"},
+        # Straight duplicate of an already-mapped id → dropped from mapped output.
+        {"problem": "c", "backlog_id": "P34",
+         "backlog_problem": "Why does Kubernetes exist?", "domain": ""},
+    ]
+    mapped, new_entries, id_by_problem = assign_ids(mappings, start, problems)
+    assert id_by_problem["reworded"] == "P34"
+    assert id_by_problem["a"] == id_by_problem["b"] == "P900"
+    assert [e["id"] for e in new_entries] == ["P900"], "one NEW problem → one entry"
+    ids = [m["id"] for m in mapped]
+    assert ids == ["P34", "P900"], f"no duplicate ids in mapped output, got {ids}"
+
+
+def test_normalize_gap_map_drops_duplicate_ids():
+    from lambda_core.pipeline import normalize_gap_map
+
+    out = normalize_gap_map(
+        [
+            {"id": "P66", "problem": "pipeline", "importance": 4, "gap": "full"},
+            {"id": "P66", "problem": "pipeline", "importance": 4, "gap": "full"},
+            {"id": "P30", "problem": "obs", "importance": 4, "gap": "partial"},
+        ],
+        mapped=[],
+    )
+    assert [g["id"] for g in out] == ["P66", "P30"]
