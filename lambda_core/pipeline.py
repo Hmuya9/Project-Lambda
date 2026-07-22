@@ -49,6 +49,37 @@ def rank(gap_map: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return ordered
 
 
+def assign_ids(
+    mappings: list[dict[str, Any]], start_counter: int
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str]]:
+    """Resolve mapping-stage output into final backlog IDs.
+
+    Returns (mapped, new_entries, id_by_problem) where id_by_problem keys the
+    ORIGINAL decoded problem wording to its final ID (never the literal "NEW").
+    """
+    mapped: list[dict[str, Any]] = []
+    new_entries: list[dict[str, Any]] = []
+    id_by_problem: dict[str, str] = {}
+    counter = start_counter
+    for m in mappings:
+        backlog_id = str(m.get("backlog_id", "")).strip()
+        if not backlog_id or backlog_id.upper() == "NEW":
+            backlog_id = f"P{counter}"
+            counter += 1
+            new_entries.append(
+                {
+                    "id": backlog_id,
+                    "problem": m.get("backlog_problem") or m.get("problem", ""),
+                    "domain": m.get("domain") or "Added from targeted runs",
+                }
+            )
+        id_by_problem[str(m.get("problem", ""))] = backlog_id
+        mapped.append(
+            {"id": backlog_id, "problem": m.get("backlog_problem") or m.get("problem", "")}
+        )
+    return mapped, new_entries, id_by_problem
+
+
 def run_pipeline(
     source_text: str,
     profile: str,
@@ -77,24 +108,9 @@ def run_pipeline(
     )
 
     # Assign real IDs to NEW problems; optionally grow the backlog (never mutate).
-    new_entries: list[dict[str, Any]] = []
-    counter = backlog_mod.next_id(problems)
-    mapped: list[dict[str, Any]] = []
-    for m in mapping.get("mappings", []):
-        backlog_id = str(m.get("backlog_id", "")).strip()
-        if backlog_id.upper() == "NEW":
-            backlog_id = f"P{counter}"
-            counter += 1
-            new_entries.append(
-                {
-                    "id": backlog_id,
-                    "problem": m.get("backlog_problem") or m.get("problem", ""),
-                    "domain": m.get("domain") or "Added from targeted runs",
-                }
-            )
-        mapped.append(
-            {"id": backlog_id, "problem": m.get("backlog_problem") or m.get("problem", "")}
-        )
+    mapped, new_entries, id_by_problem = assign_ids(
+        mapping.get("mappings", []), backlog_mod.next_id(problems)
+    )
     if update_backlog and new_entries:
         appended = backlog_mod.append_entries(new_entries)
         _log(f"      backlog grew: {', '.join(appended) or '(duplicates skipped)'}")
@@ -109,13 +125,10 @@ def run_pipeline(
     )
 
     # Attach decoded problem metadata with final IDs.
-    id_by_problem = {m["problem"]: m["id"] for m in mapping.get("mappings", [])}
     expensive_problems = []
     for p in decode.get("expensive_problems", []):
         pid = id_by_problem.get(p.get("problem", ""), "")
-        if pid.upper() == "NEW":  # defensive; should have been assigned above
-            pid = ""
-        expensive_problems.append({"id": pid or "P0", **p})
+        expensive_problems.append({**p, "id": pid or "P0"})
 
     plan: dict[str, Any] = {
         "meta": {

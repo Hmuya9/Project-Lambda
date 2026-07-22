@@ -130,3 +130,23 @@ def test_engine_has_no_jd_or_user_specific_logic():
         text = py.read_text(encoding="utf-8").lower()
         for term in banned:
             assert term not in text, f"{py.name} contains engine-overfit term: {term!r}"
+
+
+# --- id assignment (regression: KeyError 'id' on live runs) -----------------
+
+def test_assign_ids_matched_and_new():
+    from lambda_core.pipeline import assign_ids
+
+    mappings = [
+        {"problem": "Why does K8s exist?", "backlog_id": "P34", "backlog_problem": "Why does Kubernetes exist?", "domain": ""},
+        {"problem": "Why is fleet repair hard?", "backlog_id": "NEW", "backlog_problem": "Why is automating repair hard?", "domain": "Fleet Ops"},
+        {"problem": "Mystery", "backlog_id": "", "backlog_problem": "", "domain": ""},
+    ]
+    mapped, new_entries, id_by_problem = assign_ids(mappings, 65)
+    assert id_by_problem["Why does K8s exist?"] == "P34"
+    assert id_by_problem["Why is fleet repair hard?"] == "P65"
+    assert id_by_problem["Mystery"] == "P66"          # blank id treated as NEW
+    assert "NEW" not in id_by_problem.values()
+    assert [e["id"] for e in new_entries] == ["P65", "P66"]
+    assert mapped[0] == {"id": "P34", "problem": "Why does Kubernetes exist?"}
+    assert len(mapped) == 3
