@@ -181,7 +181,7 @@ if plan:
 
     tab_gap, tab_sprints, tab_pos, tab_json = st.tabs(["Gap map", "Sprints", "Positioning", "plan.json"])
     with tab_gap:
-        st.dataframe(plan["gap_map"], use_container_width=True)
+        st.dataframe(plan["gap_map"], width="stretch")
     with tab_sprints:
         from lambda_core.render import watch_url
 
