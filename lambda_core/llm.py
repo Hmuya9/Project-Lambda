@@ -1,4 +1,11 @@
-"""Thin Anthropic client wrapper. One job: prompt in, validated JSON out."""
+"""Thin LLM client wrapper. One job: prompt in, validated JSON out.
+
+Provider selection (checked in this order):
+  LAMBDA_PROVIDER=anthropic|openai  — explicit override, else:
+  ANTHROPIC_API_KEY set             — Anthropic
+  OPENAI_API_KEY set                — OpenAI-compatible (honors OPENAI_BASE_URL,
+                                      so Ollama/local servers work too)
+"""
 
 from __future__ import annotations
 
@@ -7,21 +14,33 @@ import os
 import re
 from typing import Any
 
-DEFAULT_MODEL = "claude-sonnet-5"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5"
+DEFAULT_OPENAI_MODEL = "gpt-5.6-terra"
 
 
-def resolve_config() -> tuple[str, str]:
-    """Read env config. Returns (api_key, model)."""
-    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
-    model = os.getenv("ANTHROPIC_MODEL", "").strip() or DEFAULT_MODEL
-    return api_key, model
+def resolve_config() -> tuple[str, str, str]:
+    """Read env config. Returns (provider, api_key, model)."""
+    override = os.getenv("LAMBDA_PROVIDER", "").strip().lower()
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+
+    if override == "anthropic" or (not override and anthropic_key):
+        model = os.getenv("ANTHROPIC_MODEL", "").strip() or DEFAULT_ANTHROPIC_MODEL
+        return "anthropic", anthropic_key, model
+    if override == "openai" or (not override and openai_key):
+        model = os.getenv("OPENAI_MODEL", "").strip() or DEFAULT_OPENAI_MODEL
+        return "openai", openai_key, model
+    return "none", "", ""
 
 
-def validate_config() -> tuple[str, str]:
-    api_key, model = resolve_config()
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is missing or blank (set it in .env).")
-    return api_key, model
+def validate_config() -> tuple[str, str, str]:
+    provider, api_key, model = resolve_config()
+    if provider == "none" or not api_key:
+        raise RuntimeError(
+            "No LLM credentials found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY "
+            "in .env (LAMBDA_PROVIDER=anthropic|openai to force one)."
+        )
+    return provider, api_key, model
 
 
 def _extract_json(text: str) -> Any:
@@ -36,6 +55,75 @@ def _extract_json(text: str) -> Any:
     return json.loads(text)
 
 
+def _call_anthropic(api_key: str, model: str, system: str, prompt: str, max_tokens: int) -> str:
+    import anthropic  # deferred so offline paths (render, tests) never need it
+
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        message = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except anthropic.AuthenticationError as err:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY was rejected. Check the key in .env "
+            "(console.anthropic.com → API keys). API said: " + str(err)
+        ) from err
+    except anthropic.NotFoundError as err:
+        raise RuntimeError(
+            f"Model '{model}' is not available to your account. Set "
+            "ANTHROPIC_MODEL in .env to a model you have access to. "
+            "API said: " + str(err)
+        ) from err
+    except anthropic.APIStatusError as err:
+        raise RuntimeError(
+            f"Anthropic API error (HTTP {err.status_code}) with model "
+            f"'{model}': {err.message}"
+        ) from err
+    return "".join(b.text for b in message.content if b.type == "text")
+
+
+def _call_openai(api_key: str, model: str, system: str, prompt: str, max_tokens: int) -> str:
+    import openai  # deferred
+
+    base_url = os.getenv("OPENAI_BASE_URL", "").strip() or None
+    client = openai.OpenAI(api_key=api_key, base_url=base_url) if base_url else openai.OpenAI(api_key=api_key)
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            max_completion_tokens=max_tokens,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+        )
+    except openai.AuthenticationError as err:
+        raise RuntimeError(
+            "OPENAI_API_KEY was rejected. Check the key in .env "
+            "(platform.openai.com → API keys). API said: " + str(err)
+        ) from err
+    except openai.NotFoundError as err:
+        raise RuntimeError(
+            f"Model '{model}' is not available to your account. Set "
+            "OPENAI_MODEL in .env to a model you have access to. "
+            "API said: " + str(err)
+        ) from err
+    except openai.BadRequestError as err:
+        # Older models reject max_completion_tokens / json_object combos.
+        raise RuntimeError(
+            f"OpenAI API rejected the request for model '{model}': {err}. "
+            "Try a newer model via OPENAI_MODEL in .env."
+        ) from err
+    except openai.APIStatusError as err:
+        raise RuntimeError(
+            f"OpenAI API error (HTTP {err.status_code}) with model '{model}': {err.message}"
+        ) from err
+    return response.choices[0].message.content or ""
+
+
 def complete_json(
     system: str,
     user: str,
@@ -44,39 +132,13 @@ def complete_json(
     retries: int = 2,
 ) -> Any:
     """One model call returning parsed JSON, with parse-failure retries."""
-    import anthropic  # deferred so offline paths (render, tests) never need it
-
-    api_key, model = validate_config()
-    client = anthropic.Anthropic(api_key=api_key)
+    provider, api_key, model = validate_config()
+    call = _call_anthropic if provider == "anthropic" else _call_openai
 
     prompt = user
     last_err: Exception | None = None
     for _ in range(retries + 1):
-        try:
-            message = client.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                system=system,
-                messages=[{"role": "user", "content": prompt}],
-            )
-        except anthropic.AuthenticationError as err:
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY was rejected. Check the key in .env "
-                "(console.anthropic.com → API keys). API said: " + str(err)
-            ) from err
-        except anthropic.NotFoundError as err:
-            raise RuntimeError(
-                f"Model '{model}' is not available to your account. Set "
-                "ANTHROPIC_MODEL in .env to a model you have access to "
-                "(see docs.claude.com/en/docs/about-claude/models). "
-                "API said: " + str(err)
-            ) from err
-        except anthropic.APIStatusError as err:
-            raise RuntimeError(
-                f"Anthropic API error (HTTP {err.status_code}) with model "
-                f"'{model}': {err.message}"
-            ) from err
-        text = "".join(b.text for b in message.content if b.type == "text")
+        text = call(api_key, model, system, prompt, max_tokens)
         try:
             return _extract_json(text)
         except (json.JSONDecodeError, ValueError) as err:
