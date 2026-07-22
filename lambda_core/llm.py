@@ -44,15 +44,22 @@ def validate_config() -> tuple[str, str, str]:
 
 
 def _extract_json(text: str) -> Any:
-    """Parse JSON from a model reply, tolerating markdown fences."""
+    """Parse JSON from a model reply, tolerating fences and surrounding prose."""
     text = text.strip()
+    if not text:
+        raise ValueError("model returned empty text")
     fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
     if fence:
         text = fence.group(1).strip()
-    # Fall back to the outermost braces if there is prose around the object.
-    if not text.startswith("{") and "{" in text:
-        text = text[text.index("{"): text.rindex("}") + 1]
-    return json.loads(text)
+    # Decode the FIRST JSON object found, ignoring prose before or after it —
+    # raw_decode handles trailing text that plain json.loads would reject.
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("no JSON object in model reply")
+    obj, _ = json.JSONDecoder().raw_decode(text[start:])
+    if not isinstance(obj, dict):
+        raise ValueError("model reply parsed to a non-object")
+    return obj
 
 
 def _call_anthropic(api_key: str, model: str, system: str, prompt: str, max_tokens: int) -> str:
@@ -90,16 +97,26 @@ def _call_openai(api_key: str, model: str, system: str, prompt: str, max_tokens:
 
     base_url = os.getenv("OPENAI_BASE_URL", "").strip() or None
     client = openai.OpenAI(api_key=api_key, base_url=base_url) if base_url else openai.OpenAI(api_key=api_key)
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": prompt},
+    ]
     try:
-        response = client.chat.completions.create(
-            model=model,
-            max_completion_tokens=max_tokens,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-        )
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                max_completion_tokens=max_tokens,
+                response_format={"type": "json_object"},
+                messages=messages,
+            )
+        except openai.BadRequestError:
+            # Older models / some OpenAI-compatible servers (Ollama etc.) reject
+            # max_completion_tokens or response_format — retry with legacy params.
+            response = client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=messages,
+            )
     except openai.AuthenticationError as err:
         raise RuntimeError(
             "OPENAI_API_KEY was rejected. Check the key in .env "
@@ -112,10 +129,9 @@ def _call_openai(api_key: str, model: str, system: str, prompt: str, max_tokens:
             "API said: " + str(err)
         ) from err
     except openai.BadRequestError as err:
-        # Older models reject max_completion_tokens / json_object combos.
         raise RuntimeError(
             f"OpenAI API rejected the request for model '{model}': {err}. "
-            "Try a newer model via OPENAI_MODEL in .env."
+            "Try a different model via OPENAI_MODEL in .env."
         ) from err
     except openai.APIStatusError as err:
         raise RuntimeError(

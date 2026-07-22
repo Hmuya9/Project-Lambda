@@ -19,6 +19,11 @@ def _slug(text: str, maxlen: int = 60) -> str:
     return s[:maxlen].strip() or "untitled"
 
 
+def _cell(value: Any) -> str:
+    """Make arbitrary model text safe inside a Markdown table cell."""
+    return str(value if value is not None else "").replace("|", "\\|").replace("\n", " ")
+
+
 def render_dashboard(plan: dict[str, Any], out: Path) -> Path:
     html = TEMPLATE.read_text(encoding="utf-8")
     injected = html.replace(
@@ -50,8 +55,8 @@ def _render_overview(plan: dict[str, Any], vault: Path) -> None:
     ]
     for p in rd.get("expensive_problems", []):
         lines.append(
-            f"| {p.get('id','')} | {p.get('problem','')} | {p.get('why_paid','')} "
-            f"| {p.get('jd_evidence','')} |"
+            f"| {_cell(p.get('id'))} | {_cell(p.get('problem'))} | {_cell(p.get('why_paid'))} "
+            f"| {_cell(p.get('jd_evidence'))} |"
         )
     lines += [
         "",
@@ -62,9 +67,9 @@ def _render_overview(plan: dict[str, Any], vault: Path) -> None:
     ]
     for g in sorted(plan["gap_map"], key=lambda x: x.get("priority", 99)):
         lines.append(
-            f"| {g.get('priority','')} | {g['id']} | {g['problem']} "
-            f"| {g.get('importance','')}/5 | {g.get('gap','')} "
-            f"| {g.get('transfer','')} | {g.get('credibility_risk','')} |"
+            f"| {_cell(g.get('priority'))} | {_cell(g.get('id'))} | {_cell(g.get('problem'))} "
+            f"| {_cell(g.get('importance'))}/5 | {_cell(g.get('gap'))} "
+            f"| {_cell(g.get('transfer'))} | {_cell(g.get('credibility_risk'))} |"
         )
     (vault / "00 - Plan Overview.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 

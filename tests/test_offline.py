@@ -150,3 +150,179 @@ def test_assign_ids_matched_and_new():
     assert [e["id"] for e in new_entries] == ["P65", "P66"]
     assert mapped[0] == {"id": "P34", "problem": "Why does Kubernetes exist?"}
     assert len(mapped) == 3
+
+
+# --- JSON extraction --------------------------------------------------------
+
+def test_extract_json_variants():
+    from lambda_core.llm import _extract_json
+
+    assert _extract_json('{"a": 1}') == {"a": 1}
+    assert _extract_json('```json\n{"a": 1}\n```') == {"a": 1}
+    assert _extract_json('Here is the plan:\n{"a": 1}') == {"a": 1}
+    assert _extract_json('{"a": 1}\nHope this helps!') == {"a": 1}  # trailing prose
+    assert _extract_json('prose {"a": {"b": 2}} more prose') == {"a": {"b": 2}}
+    with pytest.raises(ValueError):
+        _extract_json("")
+    with pytest.raises(ValueError):
+        _extract_json("no json here")
+    with pytest.raises(ValueError):
+        _extract_json("[1, 2, 3]")  # array, not object
+
+
+# --- rank normalization -----------------------------------------------------
+
+def test_rank_normalizes_messy_model_output():
+    from lambda_core.pipeline import rank
+
+    ranked = rank([
+        {"id": "P11", "problem": "a", "importance": "5", "gap": "Full"},   # strings
+        {"id": "P30", "problem": "b", "importance": 99, "gap": "NONE "},   # out of range
+        {"id": "P25", "problem": "c", "importance": "high", "gap": "huge"},  # garbage
+    ])
+    by_id = {g["id"]: g for g in ranked}
+    assert by_id["P11"]["importance"] == 5 and by_id["P11"]["gap"] == "full"
+    assert by_id["P30"]["importance"] == 5 and by_id["P30"]["gap"] == "none"
+    assert by_id["P25"]["importance"] == 3 and by_id["P25"]["gap"] == "partial"
+    assert [g["priority"] for g in ranked] == [1, 2, 3]
+
+
+# --- backlog insertion when Added section is not last -----------------------
+
+def test_backlog_appends_inside_added_section(tmp_path):
+    copy = tmp_path / "backlog.md"
+    copy.write_text(
+        "# Backlog\n\n## Domain A\n1. Why A?\n\n## Added from targeted runs\n"
+        "2. Why B?\n\n## Trailing Notes\nSome text.\n",
+        encoding="utf-8",
+    )
+    appended = append_entries([{"problem": "Why C?", "domain": "X"}], copy)
+    assert appended == ["P3"]
+    text = copy.read_text(encoding="utf-8")
+    added_section = text.split("## Added from targeted runs")[1].split("## ")[0]
+    assert "3. Why C?" in added_section, "entry must land INSIDE the Added section"
+    assert text.index("3. Why C?") < text.index("## Trailing Notes")
+    assert load_backlog(copy)[-1].problem == "Why C?" or "Why C?" in [p.problem for p in load_backlog(copy)]
+
+
+# --- END-TO-END: full pipeline against a mock LLM with messy output ---------
+
+MESSY_STAGE_OUTPUTS = [
+    # [1/4] decode — role fields present, problems slightly informal
+    {
+        "role_title": "Platform Engineer",
+        "company": "Acme",
+        "archetype": "Backend Platform",
+        "summary": "Keeps services alive at scale.",
+        "expensive_problems": [
+            {"problem": "Why do distributed systems fail?", "why_paid": "outages cost money", "jd_evidence": "resilient services"},
+            {"problem": "Why does observability matter?", "why_paid": "cannot fix what you cannot see", "jd_evidence": "monitoring"},
+            {"problem": "Why is fleet-scale toil expensive?", "why_paid": "manual ops do not scale", "jd_evidence": "automation"},
+        ],
+        "hard_requirements": ["Python"],
+        "wishlist": ["Go"],
+        "seniority_signal": "mid",
+    },
+    # [2/4] map — REWORDED problems (breaks exact-match lookup), one NEW, one blank id
+    {
+        "mappings": [
+            {"problem": "Why do distributed systems fail? ", "backlog_id": "P25", "backlog_problem": "Why do distributed systems fail?", "domain": ""},
+            {"problem": "Why does observability matter?", "backlog_id": "", "backlog_problem": "Why does observability matter?", "domain": ""},
+            {"problem": "Why is fleet-scale toil expensive?", "backlog_id": "NEW", "backlog_problem": "Why is fleet-scale toil expensive?", "domain": "Ops"},
+        ]
+    },
+    # [3/4] intersect — string importance, capitalized gap, one entry missing id
+    {
+        "gap_map": [
+            {"id": "P25", "problem": "Why do distributed systems fail?", "importance": "5", "transfer": "incident experience", "gap": "Partial", "credibility_risk": "no prod ownership"},
+            {"problem": "Why does observability matter?", "importance": 4, "gap": "full"},  # no id, no transfer
+            {"id": "NEW", "problem": "Why is fleet-scale toil expensive?", "importance": 3, "transfer": "", "gap": "none", "credibility_risk": ""},
+        ]
+    },
+    # [4/4] plan — schema-valid sprints and positioning
+    {
+        "positioning": {
+            "narrative": "Honest narrative.",
+            "do_not_claim": ["prod ownership"],
+            "talking_points": ["point one", "point two", "point three"],
+        },
+        "sprints": [
+            {
+                "week": w,
+                "primary": {"id": "P25", "question": f"Question for week {w}?"},
+                "secondary": [],
+                "stretch": [],
+                "evidence": {
+                    "artifact": f"Repo artifact for week {w}",
+                    "type": "repo",
+                    "done_when": "A skeptical senior reviewer would accept this artifact as done.",
+                },
+                "interview": ["2 LeetCode"],
+            }
+            for w in range(1, 5)
+        ],
+    },
+]
+
+
+def test_run_pipeline_end_to_end_with_messy_mock_llm(monkeypatch):
+    from lambda_core import pipeline
+
+    responses = [dict(r) for r in MESSY_STAGE_OUTPUTS]
+    calls = []
+
+    def fake_complete_json(system, user, *, max_tokens=8192, retries=2):
+        calls.append(user[:60])
+        assert responses, f"unexpected extra LLM call #{len(calls)}: {user[:120]}"
+        return responses.pop(0)
+
+    monkeypatch.setattr(pipeline, "complete_json", fake_complete_json)
+
+    plan = pipeline.run_pipeline(
+        "A job description about keeping services alive.",
+        "An engineer profile with incident experience.",
+        intent="targeted",
+        weeks=4,
+        update_backlog=False,  # never touch the real backlog from tests
+    )
+
+    # The returned plan passed validate_plan inside run_pipeline. Re-assert key glue:
+    validate_plan(plan)
+    assert len(calls) == 4, "each stage should run exactly once (no hidden retries)"
+    # Every decoded problem got a real P-id (wording match OR positional fallback).
+    ids = [p["id"] for p in plan["role_decode"]["expensive_problems"]]
+    assert all(ids) and "NEW" not in ids and "" not in ids
+    assert ids[0] == "P25"                      # positional fallback for reworded problem
+    # Blank and NEW backlog_ids became fresh sequential ids.
+    new_ids = [e["id"] for e in plan["new_backlog_entries"]]
+    assert len(new_ids) == 2 and all(i.startswith("P") for i in new_ids)
+    # Messy gap map was normalized: enums valid, ints in range, priorities 1..n.
+    for g in plan["gap_map"]:
+        assert g["gap"] in ("none", "partial", "full")
+        assert 1 <= g["importance"] <= 5
+    assert sorted(g["priority"] for g in plan["gap_map"]) == [1, 2, 3]
+    # The entry that came back with no id inherited one positionally.
+    assert all(g["id"].startswith("P") and g["id"][1:].isdigit() for g in plan["gap_map"])
+
+
+def test_run_pipeline_stage_retry_then_clear_error(monkeypatch):
+    """A stage missing required keys retries once, then raises a readable error."""
+    from lambda_core import pipeline
+
+    def always_wrong(system, user, *, max_tokens=8192, retries=2):
+        return {"unexpected": True}
+
+    monkeypatch.setattr(pipeline, "complete_json", always_wrong)
+    with pytest.raises(RuntimeError, match="decode stage"):
+        pipeline.run_pipeline("jd text", "profile text", update_backlog=False)
+
+
+def test_run_pipeline_intake_gate():
+    from lambda_core.pipeline import run_pipeline
+
+    with pytest.raises(ValueError, match="intake gate"):
+        run_pipeline("", "profile", update_backlog=False)
+    with pytest.raises(ValueError, match="profile"):
+        run_pipeline("jd", "   ", update_backlog=False)
+    with pytest.raises(ValueError, match="intent"):
+        run_pipeline("jd", "profile", intent="wrong", update_backlog=False)
