@@ -109,7 +109,7 @@
             "required": ["artifact", "type", "done_when"],
             "properties": {
               "artifact": { "type": "string" },
-              "type": { "enum": ["repo", "benchmark", "postmortem", "diagram", "demo", "failure-mode-table", "readme", "writeup"] },
+              "type": { "enum": ["repo", "benchmark", "postmortem", "diagram", "demo", "failure-mode-table", "verification-log", "readme", "writeup"] },
               "done_when": { "type": "string" }
             }
           },

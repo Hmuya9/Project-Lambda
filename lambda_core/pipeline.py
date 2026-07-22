@@ -33,6 +33,78 @@ GAP_WEIGHT = {"full": 3, "partial": 2, "none": 1}
 INTENTS = ("targeted", "directional", "exploratory")
 _PID = re.compile(r"^P\d+$")
 
+EVIDENCE_TYPES = {
+    "repo", "benchmark", "postmortem", "diagram", "demo",
+    "failure-mode-table", "verification-log", "readme", "writeup",
+}
+# Keyword → canonical type, checked in order. The model may phrase evidence
+# types freely ("verification log", "incident report", "FMEA table") — we
+# normalize in code instead of bouncing schema errors off the model.
+_EVIDENCE_SYNONYMS = (
+    ("bench", "benchmark"),
+    ("postmortem", "postmortem"),
+    ("incident", "postmortem"),
+    ("fmea", "failure-mode-table"),
+    ("failure", "failure-mode-table"),
+    ("table", "failure-mode-table"),
+    ("verif", "verification-log"),
+    ("log", "verification-log"),
+    ("diagram", "diagram"),
+    ("sketch", "diagram"),
+    ("architecture", "diagram"),
+    ("demo", "demo"),
+    ("video", "demo"),
+    ("readme", "readme"),
+    ("repo", "repo"),
+    ("code", "repo"),
+    ("project", "repo"),
+)
+
+
+def _normalize_evidence_type(value: Any) -> str:
+    slug = re.sub(r"[^a-z]+", "-", str(value or "").lower()).strip("-")
+    if slug in EVIDENCE_TYPES:
+        return slug
+    for key, canon in _EVIDENCE_SYNONYMS:
+        if key in slug:
+            return canon
+    return "writeup"
+
+
+def normalize_sprints(sprints: list[Any]) -> list[dict[str, Any]]:
+    """Guarantee sprint structure the schema demands; never trust model types.
+
+    After this, sprint-level schema failures can only be about SUBSTANCE
+    (e.g. a thin done_when) — which the repair pass can meaningfully fix.
+    """
+    out: list[dict[str, Any]] = []
+    for i, s in enumerate(sprints, 1):
+        if not isinstance(s, dict):
+            continue
+        s["week"] = _int(s.get("week"), i, 1, 52)
+        primary = s.get("primary") if isinstance(s.get("primary"), dict) else {}
+        primary["id"] = str(primary.get("id", "")) or "P0"
+        primary["question"] = str(primary.get("question", ""))
+        s["primary"] = primary
+        ev = s.get("evidence") if isinstance(s.get("evidence"), dict) else {}
+        ev["artifact"] = str(ev.get("artifact", ""))
+        ev["type"] = _normalize_evidence_type(ev.get("type"))
+        ev["done_when"] = str(ev.get("done_when", ""))
+        s["evidence"] = ev
+        for key in ("secondary", "stretch", "interview"):
+            value = s.get(key)
+            s[key] = [str(x) for x in value] if isinstance(value, list) else []
+        if "watch" in s:
+            watch = s.get("watch")
+            s["watch"] = [w for w in watch if isinstance(w, dict) and w.get("query")] if isinstance(watch, list) else []
+            for w in s["watch"]:
+                w["title"] = str(w.get("title", "video"))
+                w["query"] = str(w.get("query", ""))
+                if w.get("source") not in ("youtube", "mit-ocw"):
+                    w["source"] = "youtube"
+        out.append(s)
+    return out
+
 
 def _log(msg: str) -> None:
     print(msg, file=sys.stderr)
@@ -306,7 +378,7 @@ def run_plan(
         "project_options": discovery.get("project_options", []),
         "gap_map": gap_map,
         "positioning": plan_part["positioning"],
-        "sprints": plan_part["sprints"],
+        "sprints": normalize_sprints(plan_part["sprints"]),
         "new_backlog_entries": discovery.get("new_entries", []),
     }
 
@@ -326,7 +398,7 @@ def run_plan(
             max_tokens=16384,
         )
         plan["positioning"] = plan_part["positioning"]
-        plan["sprints"] = plan_part["sprints"]
+        plan["sprints"] = normalize_sprints(plan_part["sprints"])
         validate_plan(plan)
 
     return plan

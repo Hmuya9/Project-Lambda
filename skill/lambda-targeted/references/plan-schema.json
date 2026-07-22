@@ -21,6 +21,15 @@
       "required": ["summary", "expensive_problems"],
       "properties": {
         "summary": { "type": "string" },
+        "human_hook": {
+          "type": "object",
+          "description": "Tutor voice: the part that makes an engineer lean in. Optional for backward compatibility; always produced by the pipeline.",
+          "properties": {
+            "what_this_really_is": { "type": "string" },
+            "why_exciting": { "type": "string" },
+            "why_doable": { "type": "string" }
+          }
+        },
         "expensive_problems": {
           "type": "array",
           "items": {
@@ -77,6 +86,22 @@
             "required": ["id", "question"],
             "properties": { "id": { "type": "string" }, "question": { "type": "string" } }
           },
+          "simple_intro": { "type": "string", "description": "Zero-jargon, analogy-first explanation of this week's problem" },
+          "why_this_matters": { "type": "string" },
+          "watch": {
+            "type": "array",
+            "description": "Watch-first resources as SEARCH QUERIES (never URLs), gentle to deeper",
+            "items": {
+              "type": "object",
+              "required": ["title", "query"],
+              "properties": {
+                "title": { "type": "string" },
+                "query": { "type": "string" },
+                "source": { "enum": ["youtube", "mit-ocw"] },
+                "why": { "type": "string" }
+              }
+            }
+          },
           "secondary": { "type": "array", "items": { "type": "string" } },
           "stretch": { "type": "array", "items": { "type": "string" } },
           "evidence": {
@@ -84,7 +109,7 @@
             "required": ["artifact", "type", "done_when"],
             "properties": {
               "artifact": { "type": "string" },
-              "type": { "enum": ["repo", "benchmark", "postmortem", "diagram", "demo", "failure-mode-table", "readme", "writeup"] },
+              "type": { "enum": ["repo", "benchmark", "postmortem", "diagram", "demo", "failure-mode-table", "verification-log", "readme", "writeup"] },
               "done_when": { "type": "string" }
             }
           },
@@ -103,6 +128,26 @@
           "domain": { "type": "string" }
         }
       }
+    },
+    "project": {
+      "type": "object",
+      "description": "The project the engineer picked; sprints build it piece by piece. Optional for backward compatibility.",
+      "properties": {
+        "title": { "type": "string" },
+        "hook": { "type": "string" },
+        "what_you_will_see": { "type": "string" },
+        "analogy": { "type": "string" },
+        "problems_touched": { "type": "array", "items": { "type": "string" } },
+        "what_you_will_learn": { "type": "string" },
+        "difficulty": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "weeks_estimate": { "type": "integer" },
+        "first_win": { "type": "string" }
+      }
+    },
+    "project_options": {
+      "type": "array",
+      "description": "All pitched projects, recommended first",
+      "items": { "type": "object" }
     }
   }
 }

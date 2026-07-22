@@ -404,3 +404,47 @@ def test_plans_without_tutor_fields_still_valid_and_render(demo_plan, tmp_path):
     validate_plan(demo_plan)
     render_all(demo_plan, tmp_path)
     assert (tmp_path / "dashboard.html").exists()
+
+
+# --- sprint normalization (regression: 'verification log' enum crash) -------
+
+def test_normalize_sprints_handles_free_form_model_output():
+    from lambda_core.pipeline import _normalize_evidence_type, normalize_sprints
+
+    # The exact live failure: profile says "verification logs", model obliges.
+    assert _normalize_evidence_type("verification log") == "verification-log"
+    assert _normalize_evidence_type("Verification Logs") == "verification-log"
+    assert _normalize_evidence_type("incident report") == "postmortem"
+    assert _normalize_evidence_type("FMEA table") == "failure-mode-table"
+    assert _normalize_evidence_type("architecture sketch") == "diagram"
+    assert _normalize_evidence_type("code repository") == "repo"
+    assert _normalize_evidence_type("benchmark results") == "benchmark"
+    assert _normalize_evidence_type("something odd") == "writeup"
+    assert _normalize_evidence_type("") == "writeup"
+    assert _normalize_evidence_type(None) == "writeup"
+
+    sprints = normalize_sprints([
+        {
+            "week": "1",                                   # string week
+            "primary": {"id": "P25", "question": "Why?"},
+            "evidence": {"artifact": "Logs of my tests", "type": "verification log",
+                         "done_when": "A reviewer accepts the verification log as complete evidence."},
+            "interview": ["2 LeetCode"],
+            "watch": [{"query": "how it works", "source": "vimeo"},  # bad source
+                      "not-a-dict", {"title": "no query"}],
+        },
+        "garbage-entry",
+        {"week": 3, "primary": "not-a-dict", "evidence": "not-a-dict"},
+    ])
+    assert len(sprints) == 2
+    assert sprints[0]["week"] == 1
+    assert sprints[0]["evidence"]["type"] == "verification-log"
+    assert sprints[0]["watch"] == [{"title": "video", "query": "how it works", "source": "youtube"}]
+    assert sprints[1]["primary"] == {"id": "P0", "question": ""}
+    assert sprints[1]["evidence"]["type"] == "writeup"
+    assert sprints[1]["interview"] == []
+
+
+def test_verification_log_is_schema_legal(demo_plan):
+    demo_plan["sprints"][0]["evidence"]["type"] = "verification-log"
+    validate_plan(demo_plan)

@@ -213,7 +213,7 @@ Return JSON:
       ],
       "secondary": ["P8 — ..."],
       "stretch": ["..."],
-      "evidence": {{"artifact": "...", "type": "repo|benchmark|postmortem|diagram|demo|failure-mode-table|readme|writeup", "done_when": "..."}},
+      "evidence": {{"artifact": "...", "type": "repo|benchmark|postmortem|diagram|demo|failure-mode-table|verification-log|readme|writeup", "done_when": "..."}},
       "interview": ["..."]
     }}
   ]
