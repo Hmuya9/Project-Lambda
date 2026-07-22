@@ -57,12 +57,17 @@ def as_prompt_block(problems: list[Problem]) -> str:
     return "\n".join(lines)
 
 
+_ADDED_HEADER = "## Added from targeted runs"
+
+
 def append_entries(
     new_entries: list[dict], path: Path | str = DEFAULT_BACKLOG
 ) -> list[str]:
     """Append genuinely new problems under '## Added from targeted runs'.
 
-    Returns the IDs appended. Existing IDs are never touched.
+    Entries are inserted INTO that section (created at the end if absent), not
+    blindly at the end of the file — so the backlog stays correct even if other
+    sections are later added below it. Existing IDs are never touched.
     """
     if not new_entries:
         return []
@@ -70,17 +75,29 @@ def append_entries(
     problems = load_backlog(path)
     existing = {p.problem.strip().lower() for p in problems}
     text = path.read_text(encoding="utf-8")
-    if "## Added from targeted runs" not in text:
-        text = text.rstrip() + "\n\n## Added from targeted runs\n"
+    if _ADDED_HEADER not in text:
+        text = text.rstrip() + f"\n\n{_ADDED_HEADER}\n"
+
     appended: list[str] = []
+    lines_to_add: list[str] = []
     counter = next_id(problems)
     for entry in new_entries:
         problem = str(entry.get("problem", "")).strip()
         if not problem or problem.lower() in existing:
             continue
-        text = text.rstrip() + f"\n{counter}. {problem}\n"
+        lines_to_add.append(f"{counter}. {problem}")
         appended.append(f"P{counter}")
         existing.add(problem.lower())
         counter += 1
-    path.write_text(text, encoding="utf-8")
+    if not lines_to_add:
+        return []
+
+    # Insert at the end of the Added section (= before the next '## ' header,
+    # or at end of file if the section is last).
+    section_start = text.index(_ADDED_HEADER)
+    next_header = text.find("\n## ", section_start + len(_ADDED_HEADER))
+    insert_at = len(text.rstrip()) if next_header == -1 else next_header
+    block = "\n" + "\n".join(lines_to_add)
+    text = text[:insert_at].rstrip() + block + "\n" + text[insert_at:].lstrip("\n")
+    path.write_text(text.rstrip() + "\n", encoding="utf-8")
     return appended

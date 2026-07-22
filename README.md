@@ -34,7 +34,7 @@ RENDER          plan.json → Obsidian vault + self-contained dashboard (offline
 app.py                       # CLI: generate (pipeline) / render (offline)
 ui.py                        # local Streamlit UI, same pipeline
 lambda_core/
-  llm.py                     # thin Anthropic client (JSON in/out)
+  llm.py                     # thin LLM client, Anthropic or OpenAI (JSON in/out)
   prompts.py                 # per-stage prompts (iterate quality here)
   pipeline.py                # the staged pipeline + deterministic ranking
   backlog.py                 # domain backlog: parse / prompt-format / grow
@@ -54,13 +54,13 @@ examples/                    # sample JDs, profiles, and a rendered demo plan
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env                                 # set ANTHROPIC_API_KEY
+cp .env.example .env                                 # set ANTHROPIC_API_KEY or OPENAI_API_KEY
 ```
 
 ## Run
 
 ```bash
-# Full pipeline (needs ANTHROPIC_API_KEY)
+# Full pipeline (needs ANTHROPIC_API_KEY or OPENAI_API_KEY)
 python app.py generate -j examples/jobs/ai_infra_systems.md -p examples/profiles/your_real_profile.md
 
 # Directional intent: pass a domain brief or several postings concatenated

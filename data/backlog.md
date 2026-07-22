@@ -78,3 +78,6 @@ Expensive engineering problems with stable IDs. The backlog grows (new IDs); it 
 
 ## Added from targeted runs
 61. Why is scheduling GPU workloads across a cluster difficult?
+62. Why is automating hardware repair at fleet scale difficult?
+63. Why do new GPU generations need qualification (burn-in, baselining) before production?
+64. Why do compute fleets need out-of-band management (BMC/Redfish)?

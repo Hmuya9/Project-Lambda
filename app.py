@@ -39,6 +39,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Market intent (default: targeted).",
     )
     gen.add_argument("--weeks", type=int, default=8, help="Sprint count (default: 8).")
+    gen.add_argument(
+        "--project",
+        type=int,
+        default=None,
+        help="Index (0-based) of the pitched project to build around; default: recommended.",
+    )
     gen.add_argument("--out", "-o", help="Output directory (default: outputs/<role>_<date>/).")
     gen.add_argument("--no-backlog-update", action="store_true", help="Do not append new problems to data/backlog.md.")
 
@@ -80,6 +86,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
         intent=args.intent,
         weeks=args.weeks,
         update_backlog=not args.no_backlog_update,
+        project_index=args.project,
     )
 
     out = _out_dir(args.out, plan["meta"].get("role_title", "plan"))
