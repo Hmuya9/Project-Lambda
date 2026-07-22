@@ -24,6 +24,7 @@ from lambda_core.prompts import (
     decode_prompt,
     intersect_prompt,
     map_prompt,
+    pitch_prompt,
     plan_prompt,
 )
 from lambda_core.validate import ValidationError, validate_plan
@@ -165,15 +166,18 @@ def normalize_gap_map(
     return out
 
 
-def run_pipeline(
+def run_discovery(
     source_text: str,
     profile: str,
     *,
     intent: str = "targeted",
-    weeks: int = 8,
     update_backlog: bool = True,
 ) -> dict[str, Any]:
-    """Run the full pipeline and return a validated plan dict."""
+    """Phase 1: decode → map → intersect → rank → project pitches.
+
+    Returns a discovery dict the UI can show for the PROJECT PICK moment,
+    then pass to run_plan() with the chosen project.
+    """
     if intent not in INTENTS:
         raise ValueError(f"intent must be one of {INTENTS}, got {intent!r}")
     if not source_text.strip():
@@ -182,11 +186,10 @@ def run_pipeline(
         raise ValueError(
             "No engineer profile provided (intake gate). Nothing is tailored without a profile."
         )
-    weeks = _int(weeks, 8, 4, 12)
 
     problems = backlog_mod.load_backlog()
 
-    _log("[1/4] Decoding what the market pays for...")
+    _log("[1/5] Decoding what the market pays for...")
     decode = _stage(
         decode_prompt(source_text, intent), ("summary", "expensive_problems"), "decode"
     )
@@ -199,7 +202,7 @@ def run_pipeline(
             "be a job description or market composite. Check what was pasted."
         )
 
-    _log("[2/4] Mapping onto the domain backlog...")
+    _log("[2/5] Mapping onto the domain backlog...")
     mapping = _stage(
         map_prompt(decoded_problems, backlog_mod.as_prompt_block(problems)),
         ("mappings",),
@@ -219,7 +222,7 @@ def run_pipeline(
         appended = backlog_mod.append_entries(new_entries)
         _log(f"      backlog grew: {', '.join(appended) or '(duplicates skipped)'}")
 
-    _log("[3/4] Intersecting with the profile...")
+    _log("[3/5] Intersecting with the profile...")
     intersect = _stage(intersect_prompt(mapped, profile), ("gap_map",), "intersect")
     gap_map = rank(normalize_gap_map(intersect.get("gap_map", []), mapped))
     if not gap_map:
@@ -228,13 +231,14 @@ def run_pipeline(
             "Run again, or switch models via .env."
         )
 
-    _log("[4/4] Planning sprints + positioning...")
-    plan_part = _stage(
-        plan_prompt(gap_map, profile, decode, weeks),
-        ("positioning", "sprints"),
-        "plan",
-        max_tokens=16384,
+    _log("[4/5] Pitching projects that sit you close to the expensive problems...")
+    pitch = _stage(
+        pitch_prompt(gap_map, profile, decode), ("project_options",), "pitch"
     )
+    project_options = [
+        p for p in pitch.get("project_options", []) if isinstance(p, dict)
+    ]
+    recommended = _int(pitch.get("recommended", 0), 0, 0, max(0, len(project_options) - 1))
 
     # Attach decoded problem metadata with final IDs (wording match, then order).
     expensive_problems = []
@@ -243,6 +247,41 @@ def run_pipeline(
         if not pid and i < len(mapped):
             pid = mapped[i]["id"]
         expensive_problems.append({**p, "id": pid or "P0"})
+
+    return {
+        "intent": intent,
+        "decode": decode,
+        "expensive_problems": expensive_problems,
+        "mapped": mapped,
+        "new_entries": new_entries,
+        "gap_map": gap_map,
+        "project_options": project_options,
+        "recommended": recommended,
+    }
+
+
+def run_plan(
+    discovery: dict[str, Any],
+    profile: str,
+    *,
+    project: dict[str, Any] | None = None,
+    weeks: int = 8,
+) -> dict[str, Any]:
+    """Phase 2: build the sprint plan around the chosen project; validate."""
+    weeks = _int(weeks, 8, 4, 12)
+    decode = discovery["decode"]
+    gap_map = discovery["gap_map"]
+    intent = discovery.get("intent", "targeted")
+    if project is None and discovery.get("project_options"):
+        project = discovery["project_options"][discovery.get("recommended", 0)]
+
+    _log("[5/5] Planning sprints + positioning around your project...")
+    plan_part = _stage(
+        plan_prompt(gap_map, profile, decode, weeks, project=project),
+        ("positioning", "sprints"),
+        "plan",
+        max_tokens=16384,
+    )
 
     plan: dict[str, Any] = {
         "meta": {
@@ -257,15 +296,18 @@ def run_pipeline(
         },
         "role_decode": {
             "summary": str(decode.get("summary", "")),
-            "expensive_problems": expensive_problems,
+            "human_hook": decode.get("human_hook") or {},
+            "expensive_problems": discovery["expensive_problems"],
             "hard_requirements": decode.get("hard_requirements") or [],
             "wishlist": decode.get("wishlist") or [],
             "seniority_signal": str(decode.get("seniority_signal", "")),
         },
+        "project": project or {},
+        "project_options": discovery.get("project_options", []),
         "gap_map": gap_map,
         "positioning": plan_part["positioning"],
         "sprints": plan_part["sprints"],
-        "new_backlog_entries": new_entries,
+        "new_backlog_entries": discovery.get("new_entries", []),
     }
 
     try:
@@ -276,7 +318,7 @@ def run_pipeline(
         # stage's output (positioning/sprints) — the one part re-generated here.
         _log(f"      plan failed validation, repairing:\n{err}")
         plan_part = _stage(
-            plan_prompt(gap_map, profile, decode, weeks)
+            plan_prompt(gap_map, profile, decode, weeks, project=project)
             + "\n\nYour previous output failed these checks — fix them exactly:\n"
             + str(err),
             ("positioning", "sprints"),
@@ -288,3 +330,29 @@ def run_pipeline(
         validate_plan(plan)
 
     return plan
+
+
+def run_pipeline(
+    source_text: str,
+    profile: str,
+    *,
+    intent: str = "targeted",
+    weeks: int = 8,
+    update_backlog: bool = True,
+    project_index: int | None = None,
+) -> dict[str, Any]:
+    """Full pipeline in one call: discovery, then the plan.
+
+    project_index picks a pitched project; None takes the recommended one.
+    """
+    discovery = run_discovery(
+        source_text, profile, intent=intent, update_backlog=update_backlog
+    )
+    options = discovery.get("project_options", [])
+    project = None
+    if options:
+        idx = discovery.get("recommended", 0)
+        if project_index is not None:
+            idx = _int(project_index, idx, 0, len(options) - 1)
+        project = options[idx]
+    return run_plan(discovery, profile, project=project, weeks=weeks)

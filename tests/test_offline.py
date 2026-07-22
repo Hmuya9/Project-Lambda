@@ -239,7 +239,25 @@ MESSY_STAGE_OUTPUTS = [
             {"id": "NEW", "problem": "Why is fleet-scale toil expensive?", "importance": 3, "transfer": "", "gap": "none", "credibility_risk": ""},
         ]
     },
-    # [4/4] plan — schema-valid sprints and positioning
+    # [4/5] pitch — project options, one incomplete
+    {
+        "project_options": [
+            {
+                "title": "Mini fleet you can kill",
+                "hook": "Wouldn't it be cool if you could watch services die and heal themselves?",
+                "what_you_will_see": "a dashboard lighting up as pods die",
+                "analogy": "a factory line that fixes itself",
+                "problems_touched": ["P25", "P30"],
+                "what_you_will_learn": "how systems survive failure",
+                "difficulty": 3,
+                "weeks_estimate": 8,
+                "first_win": "one service auto-restarts on your screen",
+            },
+            {"title": "Second option"},
+        ],
+        "recommended": 0,
+    },
+    # [5/5] plan — schema-valid sprints and positioning
     {
         "positioning": {
             "narrative": "Honest narrative.",
@@ -288,7 +306,10 @@ def test_run_pipeline_end_to_end_with_messy_mock_llm(monkeypatch):
 
     # The returned plan passed validate_plan inside run_pipeline. Re-assert key glue:
     validate_plan(plan)
-    assert len(calls) == 4, "each stage should run exactly once (no hidden retries)"
+    assert len(calls) == 5, "each stage should run exactly once (no hidden retries)"
+    # The recommended project was chosen and carried into the plan.
+    assert plan["project"]["title"] == "Mini fleet you can kill"
+    assert len(plan["project_options"]) == 2
     # Every decoded problem got a real P-id (wording match OR positional fallback).
     ids = [p["id"] for p in plan["role_decode"]["expensive_problems"]]
     assert all(ids) and "NEW" not in ids and "" not in ids
@@ -326,3 +347,60 @@ def test_run_pipeline_intake_gate():
         run_pipeline("jd", "   ", update_backlog=False)
     with pytest.raises(ValueError, match="intent"):
         run_pipeline("jd", "profile", intent="wrong", update_backlog=False)
+
+
+# --- watch links ------------------------------------------------------------
+
+def test_watch_url_never_a_dead_link():
+    from lambda_core.render import watch_url
+
+    yt = watch_url({"query": "how does kubernetes work 3blue1brown style", "source": "youtube"})
+    assert yt.startswith("https://www.youtube.com/results?search_query=")
+    assert "3blue1brown" in yt
+    ocw = watch_url({"query": "distributed systems lecture", "source": "mit-ocw"})
+    assert ocw.startswith("https://ocw.mit.edu/search/?q=")
+    # missing source defaults to youtube; special chars are encoded
+    assert "search_query=a%2Bb" in watch_url({"query": "a+b"}) or "search_query=a%2Bb" == watch_url({"query": "a+b"}).split("?")[1].split("=",1)[1] and True
+    assert watch_url({"query": "kv cache & memory"}).count(" ") == 0
+
+
+def test_tutor_fields_render_in_vault_and_dashboard(tmp_path, demo_plan):
+    """A plan WITH tutor fields renders hook, project, and watch links."""
+    demo_plan["role_decode"]["human_hook"] = {
+        "what_this_really_is": "This role is about keeping a robot city alive.",
+        "why_exciting": "You get to watch machines heal themselves.",
+        "why_doable": "One small machine at a time.",
+    }
+    demo_plan["project"] = {
+        "title": "Mini fleet you can kill",
+        "hook": "Wouldn't it be cool?",
+        "what_you_will_see": "dashboards lighting up",
+        "analogy": "a factory that fixes itself",
+        "problems_touched": ["P25"],
+        "what_you_will_learn": "resilience",
+        "difficulty": 3,
+        "weeks_estimate": 8,
+        "first_win": "first auto-restart on screen",
+    }
+    demo_plan["sprints"][0]["simple_intro"] = "Imagine a mailroom for programs."
+    demo_plan["sprints"][0]["watch"] = [
+        {"title": "Containers in 100 seconds", "query": "docker explained 100 seconds", "source": "youtube", "why": "picture the box"},
+        {"title": "MIT lecture", "query": "containers virtualization", "source": "mit-ocw"},
+    ]
+    validate_plan(demo_plan)  # new fields must not break the schema
+    render_all(demo_plan, tmp_path)
+    week1 = (tmp_path / "vault" / "02 - Weekly Sprints" / "Week 1.md").read_text(encoding="utf-8")
+    assert "Say It Human First" in week1 and "mailroom" in week1
+    assert "youtube.com/results?search_query=docker" in week1
+    assert "ocw.mit.edu/search" in week1
+    overview = (tmp_path / "vault" / "00 - Plan Overview.md").read_text(encoding="utf-8")
+    assert "robot city" in overview and "Mini fleet you can kill" in overview
+    dashboard = (tmp_path / "dashboard.html").read_text(encoding="utf-8")
+    assert "robot city" in dashboard and "Mini fleet you can kill" in dashboard
+
+
+def test_plans_without_tutor_fields_still_valid_and_render(demo_plan, tmp_path):
+    """Backward compatibility: old plans (no hook/project/watch) keep working."""
+    validate_plan(demo_plan)
+    render_all(demo_plan, tmp_path)
+    assert (tmp_path / "dashboard.html").exists()

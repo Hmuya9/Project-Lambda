@@ -106,6 +106,20 @@
 
 <div class="tiles" id="tiles"></div>
 
+<section id="hook-section" style="display:none">
+  <h2>What this role really is</h2>
+  <p class="sub" id="hook-what" style="font-size:14.5px; line-height:1.6; color:var(--ink-1); margin-bottom:10px"></p>
+  <p class="sub" id="hook-exciting" style="line-height:1.55; margin-bottom:8px"></p>
+  <p class="sub" id="hook-doable" style="line-height:1.55"></p>
+</section>
+
+<section id="project-section" style="display:none">
+  <h2 id="project-title"></h2>
+  <p class="sub" id="project-hook" style="font-size:14px; line-height:1.6; color:var(--ink-1); margin-bottom:10px"></p>
+  <div class="evbox" id="project-details"></div>
+  <div id="project-meta" style="margin-top:10px"></div>
+</section>
+
 <section>
   <h2>Role Decode — what this job actually pays for</h2>
   <p class="sub" id="decode-summary" style="margin-bottom:10px"></p>
@@ -171,9 +185,33 @@ if (!PLAN) {
   ];
   el('tiles').innerHTML = tiles.map(t => '<div class="tile"><div class="v">' + t[0] + '</div><div class="l">' + esc(t[1]) + '</div></div>').join('');
 
+  const hook = (PLAN.role_decode||{}).human_hook || {};
+  if (hook.what_this_really_is) {
+    el('hook-section').style.display = '';
+    el('hook-what').textContent = hook.what_this_really_is;
+    el('hook-exciting').innerHTML = '<b style="color:var(--ink-1)">Why it\'s exciting — </b>' + esc(hook.why_exciting||'');
+    el('hook-doable').innerHTML = '<b style="color:var(--ink-1)">Why it\'s doable — </b>' + esc(hook.why_doable||'');
+  }
+  const proj = PLAN.project || {};
+  if (proj.title) {
+    el('project-section').style.display = '';
+    el('project-title').textContent = 'Your Project — ' + proj.title;
+    el('project-hook').textContent = proj.hook || '';
+    el('project-details').innerHTML =
+      '<b>What you\'ll see:</b> ' + esc(proj.what_you_will_see||'') +
+      '<br><b>Think of it as:</b> ' + esc(proj.analogy||'') +
+      '<br><b>First win:</b> ' + esc(proj.first_win||'');
+    el('project-meta').innerHTML =
+      '<span class="chip">difficulty ' + esc(String(proj.difficulty ?? '?')) + '/5</span>' +
+      '<span class="chip">~' + esc(String(proj.weeks_estimate ?? '?')) + ' weeks</span>' +
+      (proj.problems_touched||[]).map(p => '<span class="chip">' + esc(p) + '</span>').join('');
+  }
+
   el('decode-summary').textContent = (PLAN.role_decode||{}).summary || '';
   el('decode-body').innerHTML = ((PLAN.role_decode||{}).expensive_problems||[]).map(p =>
-    '<tr><td class="prob"><span class="pid">' + esc(p.id) + '</span>' + esc(p.problem) + '</td><td>' + esc(p.why_paid) + '</td><td><em style="color:var(--ink-muted)">' + esc(p.jd_evidence||'') + '</em></td></tr>'
+    '<tr><td class="prob"><span class="pid">' + esc(p.id) + '</span>' + esc(p.problem) +
+    (p.human ? '<div style="font-weight:400; color:var(--ink-muted); font-size:12px; margin-top:3px">' + esc(p.human) + '</div>' : '') +
+    '</td><td>' + esc(p.why_paid) + '</td><td><em style="color:var(--ink-muted)">' + esc(p.jd_evidence||'') + '</em></td></tr>'
   ).join('');
 
   const gapLabel = { none: 'None — strength', partial: 'Partial', full: 'Full gap' };
@@ -189,13 +227,29 @@ if (!PLAN) {
 
   const stCycle = ['todo','doing','done'];
   const stLabel = { todo: 'To do', doing: '⏳ In progress', done: '✓ Done' };
+  function watchUrl(w){
+    const q = encodeURIComponent(w.query||'');
+    return w.source === 'mit-ocw' ? 'https://ocw.mit.edu/search/?q=' + q
+                                  : 'https://www.youtube.com/results?search_query=' + q;
+  }
   el('weeks').innerHTML = sprints.map((s,i) => {
     const sec = (s.secondary||[]).map(esc).join(' · ');
     const str = (s.stretch||[]).map(esc).join(' · ');
     const iv = (s.interview||[]).map(esc).join(' · ');
+    const intro = s.simple_intro
+      ? '<div class="list" style="color:var(--ink-2); font-size:13px; line-height:1.5">' + esc(s.simple_intro) +
+        (s.why_this_matters ? '<div style="margin-top:4px; color:var(--ink-muted)"><b style="font-size:11px; text-transform:uppercase; letter-spacing:0.04em">Why it matters</b><br>' + esc(s.why_this_matters) + '</div>' : '') +
+        '</div>'
+      : '';
+    const watch = (s.watch||[]).filter(w => w && w.query).map(w =>
+      '<a href="' + watchUrl(w) + '" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none">▶ ' + esc(w.title||'video') + '</a>' +
+      (w.why ? ' <span style="color:var(--ink-muted)">— ' + esc(w.why) + '</span>' : '')
+    ).join('<br>');
     return '<div class="week"><div class="head"><span class="wk">Week ' + s.week + ' <span class="pid">' + esc((s.primary||{}).id||'') + '</span></span>' +
       '<button class="stbtn" data-i="' + i + '" data-s="todo" onclick="cycle(this)">To do</button></div>' +
       '<div class="primary">' + esc((s.primary||{}).question||'') + '</div>' +
+      intro +
+      (watch ? '<div class="list" style="font-size:12.5px; line-height:1.8"><b>Watch first (gentle → deeper)</b>' + watch + '</div>' : '') +
       '<div class="list">' + (sec ? '<b>Secondary</b>' + sec : '') + (str ? '<b>Stretch</b>' + str : '') + '</div>' +
       '<div class="evbox"><b>Evidence · ' + esc((s.evidence||{}).type||'') + ':</b> ' + esc((s.evidence||{}).artifact||'') +
       '<br><b>Done when:</b> ' + esc((s.evidence||{}).done_when||'') + '</div>' +
